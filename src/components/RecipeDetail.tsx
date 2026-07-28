@@ -19,6 +19,7 @@ import {
   getPriceForMargin,
   getMarginFromPrice,
   getMarkupFromPrice,
+  generateId,
 } from '../store';
 
 
@@ -27,6 +28,32 @@ export default function RecipeDetail() {
   const actions = usePersistedActions();
   const recipe = state.recipes.find((r) => r.id === state.selectedRecipeId);
   const [showDelete, setShowDelete] = useState(false);
+
+  // ─── Batch Scaler & Recipe Multiplier State ───
+  const [scaleMode, setScaleMode] = useState<'quick' | 'anchor' | 'servings' | 'bakers'>('quick');
+  const [multiplier, setMultiplier] = useState<number>(1);
+  const [customServings, setCustomServings] = useState<string>((recipe?.servings || 1).toString());
+  
+  const defaultAnchorId = recipe?.ingredients[0]?.ingredientId || '';
+  const [anchorIngId, setAnchorIngId] = useState<string>(defaultAnchorId);
+  const anchorRecipeIng = recipe?.ingredients.find((ri) => ri.ingredientId === anchorIngId) || recipe?.ingredients[0];
+  const [anchorQtyInput, setAnchorQtyInput] = useState<string>((anchorRecipeIng?.qty || 1).toString());
+
+  // ─── Baker's Math State (100% Flour Base) ───
+  const flourRecipeIngs = (recipe?.ingredients || []).filter((ri) => {
+    const ing = state.ingredients.find((i) => i.id === ri.ingredientId);
+    const name = (ing?.name || '').toLowerCase();
+    return name.includes('flour') || name.includes('harina') || name.includes('wheat') || name.includes('semolina');
+  });
+  const origTotalFlourQty = flourRecipeIngs.length > 0
+    ? flourRecipeIngs.reduce((sum, ri) => sum + ri.qty, 0)
+    : (recipe?.ingredients[0]?.qty || 1);
+  const origTotalDoughQty = (recipe?.ingredients || []).reduce((sum, ri) => sum + ri.qty, 0) || 1;
+  const [targetFlourInput, setTargetFlourInput] = useState<string>(origTotalFlourQty.toString());
+  const [targetDoughInput, setTargetDoughInput] = useState<string>(origTotalDoughQty.toString());
+
+  const [copiedToast, setCopiedToast] = useState(false);
+  const [savedToast, setSavedToast] = useState(false);
 
   if (!recipe) {
     return (
@@ -71,8 +98,120 @@ export default function RecipeDetail() {
   const lpgAppliances = oh.appliances.filter(a => a.type === 'lpg-stove' || a.type === 'lpg-oven');
   const electricAppliances = oh.appliances.filter(a => a.type === 'electric');
 
+  // ─── Batch Scaling Calculations & Handlers ───
+  const isScaled = Math.abs(multiplier - 1) > 0.001;
+
+  function handleSetMultiplier(m: number) {
+    if (!recipe) return;
+    setMultiplier(m);
+    setCustomServings((recipe.servings * m).toFixed(1).replace(/\.0$/, ''));
+    if (anchorRecipeIng) {
+      setAnchorQtyInput((anchorRecipeIng.qty * m).toFixed(2).replace(/\.00$/, ''));
+    }
+  }
+
+  function handleServingsChange(val: string) {
+    if (!recipe) return;
+    setCustomServings(val);
+    const numServings = parseFloat(val) || 0;
+    const newMult = recipe.servings > 0 ? numServings / recipe.servings : 1;
+    setMultiplier(newMult > 0 ? newMult : 0);
+    if (anchorRecipeIng) {
+      setAnchorQtyInput((anchorRecipeIng.qty * (newMult || 0)).toFixed(2).replace(/\.00$/, ''));
+    }
+  }
+
+  function handleAnchorQtyChange(val: string) {
+    if (!recipe) return;
+    setAnchorQtyInput(val);
+    const qty = parseFloat(val) || 0;
+    const origQty = anchorRecipeIng?.qty || 1;
+    const newMult = origQty > 0 ? qty / origQty : 1;
+    setMultiplier(newMult > 0 ? newMult : 0);
+    setCustomServings((recipe.servings * (newMult || 0)).toFixed(1).replace(/\.0$/, ''));
+    setTargetFlourInput((origTotalFlourQty * (newMult || 0)).toFixed(2).replace(/\.00$/, ''));
+    setTargetDoughInput((origTotalDoughQty * (newMult || 0)).toFixed(2).replace(/\.00$/, ''));
+  }
+
+  function handleFlourWeightChange(val: string) {
+    if (!recipe) return;
+    setTargetFlourInput(val);
+    const newFlour = parseFloat(val) || 0;
+    const newMult = origTotalFlourQty > 0 ? newFlour / origTotalFlourQty : 1;
+    setMultiplier(newMult > 0 ? newMult : 0);
+    setCustomServings((recipe.servings * (newMult || 0)).toFixed(1).replace(/\.0$/, ''));
+    setTargetDoughInput((origTotalDoughQty * (newMult || 0)).toFixed(2).replace(/\.00$/, ''));
+    if (anchorRecipeIng) {
+      setAnchorQtyInput((anchorRecipeIng.qty * (newMult || 0)).toFixed(2).replace(/\.00$/, ''));
+    }
+  }
+
+  function handleDoughWeightChange(val: string) {
+    if (!recipe) return;
+    setTargetDoughInput(val);
+    const newDough = parseFloat(val) || 0;
+    const newMult = origTotalDoughQty > 0 ? newDough / origTotalDoughQty : 1;
+    setMultiplier(newMult > 0 ? newMult : 0);
+    setCustomServings((recipe.servings * (newMult || 0)).toFixed(1).replace(/\.0$/, ''));
+    setTargetFlourInput((origTotalFlourQty * (newMult || 0)).toFixed(2).replace(/\.00$/, ''));
+    if (anchorRecipeIng) {
+      setAnchorQtyInput((anchorRecipeIng.qty * (newMult || 0)).toFixed(2).replace(/\.00$/, ''));
+    }
+  }
+
+  function handleSelectAnchor(ingId: string) {
+    if (!recipe) return;
+    setAnchorIngId(ingId);
+    const targetIng = recipe.ingredients.find((ri) => ri.ingredientId === ingId);
+    if (targetIng) {
+      setAnchorQtyInput((targetIng.qty * multiplier).toFixed(2).replace(/\.00$/, ''));
+    }
+  }
+
+  function copyScaledShoppingList() {
+    if (!recipe) return;
+    const lines: string[] = [
+      `🛒 Shopping List: ${recipe.name} (${multiplier.toFixed(2).replace(/\.00$/, '')}x batch / ${(recipe.servings * multiplier).toFixed(1).replace(/\.0$/, '')} servings)`,
+      `────────────────────────────`,
+    ];
+    recipe.ingredients.forEach((ri) => {
+      const ing = ingredients.find((i) => i.id === ri.ingredientId);
+      if (ing) {
+        const scaledQty = ri.qty * multiplier;
+        lines.push(`• ${scaledQty.toFixed(2).replace(/\.00$/, '')} ${ri.unit} - ${ing.name}`);
+      }
+    });
+    lines.push(`────────────────────────────`);
+    lines.push(`Estimated Ingredients Cost: ${formatPeso(rawCost * multiplier)}`);
+    
+    navigator.clipboard.writeText(lines.join('\n'));
+    setCopiedToast(true);
+    setTimeout(() => setCopiedToast(false), 2500);
+  }
+
+  function saveScaledAsNewRecipe() {
+    if (!recipe) return;
+    const scaledRecipe = {
+      ...recipe,
+      id: generateId(),
+      name: `${recipe.name} (${multiplier.toFixed(2).replace(/\.00$/, '')}x Scaled)`,
+      servings: parseFloat((recipe.servings * multiplier).toFixed(1)),
+      ingredients: recipe.ingredients.map((ri) => ({
+        ...ri,
+        qty: parseFloat((ri.qty * multiplier).toFixed(3)),
+      })),
+      notes: `${recipe.notes}\n[Scaled ${multiplier.toFixed(2)}x from original ${recipe.servings} servings batch on ${new Date().toLocaleDateString('en-PH')}]`.trim(),
+    };
+    actions.addRecipe(scaledRecipe);
+    setSavedToast(true);
+    setTimeout(() => {
+      setSavedToast(false);
+      dispatch({ type: 'SET_VIEW', view: 'recipes' });
+    }, 2000);
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <button
@@ -82,7 +221,7 @@ export default function RecipeDetail() {
           ←
         </button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-extrabold text-gray-900 truncate">{recipe.name}</h1>
+          <h1 className="truncate text-xl font-extrabold text-gray-900 md:text-3xl">{recipe.name}</h1>
           <p className="text-xs text-gray-500">{recipe.category} • {recipe.servings} servings</p>
         </div>
         <button
@@ -94,7 +233,7 @@ export default function RecipeDetail() {
       </div>
 
       {/* Profit Hero Card */}
-      <div className={`rounded-3xl p-5 text-white relative overflow-hidden ${
+      <div className={`relative overflow-hidden rounded-3xl p-5 text-white md:p-8 ${
         isLoss ? 'bg-gradient-to-br from-red-500 to-red-700'
           : isLow ? 'bg-gradient-to-br from-amber-500 to-amber-600'
           : 'bg-gradient-to-br from-green-500 to-green-700'
@@ -106,7 +245,7 @@ export default function RecipeDetail() {
             {isLoss ? '🚨 Lugi per Serving!' : isLow ? '⚠️ Low Margin' : '✅ Healthy Margin'}
           </p>
           <div className="flex items-end gap-3 mt-2">
-            <p className="text-4xl font-extrabold">{margin.toFixed(1)}%</p>
+            <p className="text-4xl font-extrabold md:text-5xl">{margin.toFixed(1)}%</p>
             <p className="text-sm opacity-80 mb-1">profit margin</p>
           </div>
           <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-white/20">
@@ -252,31 +391,336 @@ export default function RecipeDetail() {
         )}
       </div>
 
-      {/* Ingredients Used */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-4">
-        <h2 className="text-sm font-bold text-gray-900 mb-3">🧅 Ingredients ({recipe.ingredients.length})</h2>
-        <div className="space-y-2">
-          {recipe.ingredients.map((ri, idx) => {
-            const ing = ingredients.find((i) => i.id === ri.ingredientId);
-            if (!ing) return <div key={idx} className="text-xs text-red-500 italic">Unknown ingredient (deleted?)</div>;
-            const unitCost = getIngredientCostPerUnit(ing);
-            const lineCost = unitCost * ri.qty;
-            const pctOfTotal = rawCost > 0 ? (lineCost / rawCost) * 100 : 0;
+      {/* ─── Batch Scaler & Recipe Multiplier ─── */}
+      <div className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-2xs md:p-6">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+          <div>
+            <h2 className="text-sm font-extrabold text-gray-900 flex items-center gap-1.5">
+              <span>⚖️ Batch Scaler & Recipe Multiplier</span>
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Scale by batch size, target servings, or available ingredient weight
+            </p>
+          </div>
+          {isScaled && (
+            <button
+              onClick={() => handleSetMultiplier(1)}
+              className="px-2.5 py-1 bg-orange-100 hover:bg-orange-200 text-orange-800 text-[11px] font-extrabold rounded-lg shrink-0 transition-colors"
+            >
+              Reset (1x)
+            </button>
+          )}
+        </div>
 
-            return (
-              <div key={idx} className="flex items-center justify-between py-1.5">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-gray-800 truncate">{ing.name}</p>
-                  <p className="text-xs text-gray-400">{ri.qty} {ri.unit} × {formatPeso(unitCost)}/{ing.purchaseUnit}</p>
+        {/* Scaler Mode Tabs */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-gray-100 p-1 rounded-xl text-center">
+          {[
+            { id: 'quick', label: '⚡ Multiplier' },
+            { id: 'anchor', label: '🥩 By Ingredient' },
+            { id: 'servings', label: '🍽️ By Servings' },
+            { id: 'bakers', label: "🍞 Baker's Math" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setScaleMode(tab.id as any)}
+              className={`py-2 px-1 rounded-lg text-xs font-bold transition-all ${
+                scaleMode === tab.id
+                  ? 'bg-white text-orange-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* MODE 1: QUICK MULTIPLIERS */}
+        {scaleMode === 'quick' && (
+          <div className="space-y-3 pt-1">
+            <p className="text-xs text-gray-600">
+              Current scale: <strong className="text-orange-600 font-extrabold">{multiplier.toFixed(2).replace(/\.00$/, '')}x</strong> batch ({ (recipe.servings * multiplier).toFixed(1).replace(/\.0$/, '') } servings)
+            </p>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              {[0.5, 1, 1.5, 2, 3, 5].map((val) => (
+                <button
+                  key={val}
+                  onClick={() => handleSetMultiplier(val)}
+                  className={`py-2 px-1 rounded-xl text-xs font-extrabold transition-all border ${
+                    Math.abs(multiplier - val) < 0.001
+                      ? 'bg-orange-600 text-white border-orange-600 shadow-sm'
+                      : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                  }`}
+                >
+                  {val}x {val === 0.5 ? '(Half)' : val === 1 ? '(Orig)' : val === 2 ? '(Double)' : ''}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <label className="text-xs text-gray-500 font-medium shrink-0">Custom Multiplier:</label>
+              <input
+                type="number"
+                value={multiplier === 0 ? '' : multiplier}
+                onChange={(e) => handleSetMultiplier(parseFloat(e.target.value) || 0)}
+                placeholder="1.0"
+                step="0.1"
+                min="0"
+                className="w-24 px-3 py-1.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-300"
+              />
+              <span className="text-xs font-bold text-orange-600">x batch</span>
+            </div>
+          </div>
+        )}
+
+        {/* MODE 2: BY ANCHOR INGREDIENT */}
+        {scaleMode === 'anchor' && (
+          <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-4 space-y-3">
+            <p className="text-xs font-bold text-amber-900">
+              💡 How much of your main ingredient do you have right now?
+            </p>
+            <div className="space-y-2">
+              <div>
+                <label className="text-[10px] uppercase font-extrabold text-amber-800">1. Select Anchor Ingredient:</label>
+                <select
+                  value={anchorIngId}
+                  onChange={(e) => handleSelectAnchor(e.target.value)}
+                  className="mt-1 w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                >
+                  {recipe.ingredients.map((ri) => {
+                    const ingObj = ingredients.find((i) => i.id === ri.ingredientId);
+                    return (
+                      <option key={ri.ingredientId} value={ri.ingredientId}>
+                        {ingObj?.name || 'Unknown Item'} (Orig: {ri.qty} {ri.unit})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div className="bg-white p-2.5 rounded-xl border border-amber-200">
+                  <p className="text-[10px] font-semibold text-gray-500">Original Quantity</p>
+                  <p className="text-sm font-extrabold text-gray-800 mt-0.5">
+                    {anchorRecipeIng?.qty || 0} {anchorRecipeIng?.unit}
+                  </p>
                 </div>
-                <div className="text-right shrink-0 ml-3">
-                  <p className="text-sm font-bold text-gray-800">{formatPeso(lineCost)}</p>
-                  <p className="text-[10px] text-gray-400">{pctOfTotal.toFixed(1)}%</p>
+                <div>
+                  <label className="text-[10px] font-semibold text-gray-700">2. Available Quantity ({anchorRecipeIng?.unit})</label>
+                  <input
+                    type="number"
+                    value={anchorQtyInput}
+                    onChange={(e) => handleAnchorQtyChange(e.target.value)}
+                    placeholder={anchorRecipeIng?.qty.toString() || '1'}
+                    step="0.01"
+                    min="0"
+                    className="mt-1 w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-sm font-extrabold text-orange-600 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
                 </div>
               </div>
-            );
-          })}
+              <p className="text-xs text-amber-950 font-medium pt-1">
+                &rarr; All ingredients, recipe yield ({ (recipe.servings * multiplier).toFixed(1).replace(/\.0$/, '') } pax), and batch costs scaled by <strong>{multiplier.toFixed(2).replace(/\.00$/, '')}x</strong>!
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* MODE 3: BY TARGET SERVINGS */}
+        {scaleMode === 'servings' && (
+          <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl p-4 space-y-3">
+            <p className="text-xs font-bold text-emerald-900">
+              🍽️ How many guests or orders do you need to serve?
+            </p>
+            <div className="grid grid-cols-2 gap-3 items-center">
+              <div className="bg-white p-3 rounded-xl border border-emerald-200">
+                <p className="text-[10px] font-semibold text-gray-500">Original Recipe Yield</p>
+                <p className="text-base font-extrabold text-gray-800 mt-0.5">{recipe.servings} servings</p>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-emerald-900">Target Servings (Pax):</label>
+                <input
+                  type="number"
+                  value={customServings}
+                  onChange={(e) => handleServingsChange(e.target.value)}
+                  placeholder={recipe.servings.toString()}
+                  min="1"
+                  className="mt-1 w-full px-3 py-2.5 bg-white border border-emerald-300 rounded-xl text-base font-extrabold text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-emerald-950 font-medium">
+              &rarr; Multiplier automatically calculated at <strong>{multiplier.toFixed(2).replace(/\.00$/, '')}x</strong> to yield exact portions!
+            </p>
+          </div>
+        )}
+
+        {/* MODE 4: BAKER'S MATH / BAKER'S FORMULA (100% FLOUR BASE) */}
+        {scaleMode === 'bakers' && (
+          <div className="bg-amber-50/80 border border-amber-300 rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-extrabold text-amber-900 flex items-center gap-1">
+                <span>🍞 Baker's Math & Formula Scaling</span>
+              </p>
+              <span className="px-2 py-0.5 bg-amber-200 text-amber-900 text-[10px] font-bold rounded-md">
+                100% Flour Base
+              </span>
+            </div>
+            <p className="text-[11px] text-amber-900/90 leading-relaxed">
+              In professional baking & pastry, <strong>Total Flour is ALWAYS 100%</strong>. Every other ingredient is scaled relative to total flour weight.
+            </p>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <div>
+                <label className="text-[10px] font-extrabold text-amber-900 uppercase">1. Target Total Flour Weight</label>
+                <input
+                  type="number"
+                  value={targetFlourInput}
+                  onChange={(e) => handleFlourWeightChange(e.target.value)}
+                  placeholder={origTotalFlourQty.toString()}
+                  step="0.01"
+                  min="0"
+                  className="mt-1 w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-sm font-extrabold text-orange-700 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+                <p className="text-[10px] text-amber-700 mt-0.5">Orig flour: {origTotalFlourQty} kg/g</p>
+              </div>
+              <div>
+                <label className="text-[10px] font-extrabold text-amber-900 uppercase">2. Target Total Dough Weight</label>
+                <input
+                  type="number"
+                  value={targetDoughInput}
+                  onChange={(e) => handleDoughWeightChange(e.target.value)}
+                  placeholder={origTotalDoughQty.toString()}
+                  step="0.01"
+                  min="0"
+                  className="mt-1 w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-sm font-extrabold text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+                <p className="text-[10px] text-amber-700 mt-0.5">Orig dough: {origTotalDoughQty} kg/g</p>
+              </div>
+            </div>
+            <p className="text-xs text-amber-950 font-medium">
+              &rarr; All ingredients scaled by <strong>{multiplier.toFixed(2).replace(/\.00$/, '')}x</strong> while maintaining exact Baker's Percentages!
+            </p>
+          </div>
+        )}
+
+        {/* ─── Ingredients Used Table w/ Scaled Quantities & Baker's Math ─── */}
+        <div className="pt-2">
+          <div className="flex items-center justify-between mb-2.5">
+            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+              <span>🧅 Ingredients List ({recipe.ingredients.length})</span>
+              {isScaled && (
+                <span className="px-2 py-0.5 bg-orange-100 text-orange-800 text-[10px] font-extrabold rounded-full animate-pulse">
+                  Scaled {multiplier.toFixed(2).replace(/\.00$/, '')}x
+                </span>
+              )}
+            </h3>
+            {isScaled && (
+              <span className="text-xs font-bold text-orange-600">
+                Total: {formatPeso(rawCost * multiplier)}
+              </span>
+            )}
+          </div>
+
+          <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+            {recipe.ingredients.map((ri, idx) => {
+              const ing = ingredients.find((i) => i.id === ri.ingredientId);
+              if (!ing) return <div key={idx} className="text-xs text-red-500 italic p-3">Unknown ingredient (deleted?)</div>;
+              const unitCost = getIngredientCostPerUnit(ing);
+              const lineCost = unitCost * ri.qty;
+              const scaledQty = ri.qty * multiplier;
+              const scaledLineCost = lineCost * multiplier;
+              const pctOfTotal = rawCost > 0 ? (lineCost / rawCost) * 100 : 0;
+              const bakersPct = origTotalFlourQty > 0 ? (ri.qty / origTotalFlourQty) * 100 : 0;
+
+              return (
+                <div key={idx} className={`flex items-center justify-between p-3 ${isScaled ? 'bg-orange-50/30 hover:bg-orange-50/60' : 'bg-white hover:bg-gray-50/70'} transition-colors`}>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-sm font-bold text-gray-900 truncate">{ing.name}</p>
+                      {scaleMode === 'bakers' && (
+                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-900 text-[10px] font-extrabold rounded-md border border-amber-200">
+                          🌾 {bakersPct.toFixed(1)}%
+                        </span>
+                      )}
+                    </div>
+                    {isScaled ? (
+                      <div className="text-xs mt-0.5">
+                        <span className="font-extrabold text-orange-600 bg-orange-100/80 px-1.5 py-0.5 rounded-md border border-orange-200">
+                          {scaledQty.toFixed(2).replace(/\.00$/, '')} {ri.unit}
+                        </span>
+                        <span className="text-gray-400 ml-1.5 text-[11px]">(was {ri.qty} {ri.unit})</span>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-500 mt-0.5">{ri.qty} {ri.unit} × {formatPeso(unitCost)}/{ing.purchaseUnit}</p>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0 ml-3">
+                    <p className={`text-sm font-extrabold ${isScaled ? 'text-orange-600' : 'text-gray-900'}`}>
+                      {formatPeso(scaledLineCost)}
+                    </p>
+                    <p className="text-[10px] text-gray-400">
+                      {isScaled ? `was ${formatPeso(lineCost)}` : `${pctOfTotal.toFixed(1)}%`}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
+
+        {/* Scaled Batch Summary Card & Actions */}
+        {isScaled && (
+          <div className="bg-gradient-to-br from-gray-900 to-slate-800 rounded-2xl p-4 text-white space-y-3.5 shadow-md">
+            <div className="flex items-center justify-between border-b border-white/15 pb-2.5">
+              <div>
+                <p className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">📦 Scaled Batch Summary</p>
+                <h4 className="text-sm font-extrabold text-white">{recipe.name} ({multiplier.toFixed(2).replace(/\.00$/, '')}x)</h4>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] text-gray-400">Total Yield</p>
+                <p className="text-base font-extrabold text-orange-400">{(recipe.servings * multiplier).toFixed(1).replace(/\.0$/, '')} pax</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+              <div className="bg-white/10 p-2 rounded-xl">
+                <p className="text-[10px] text-gray-300 font-semibold uppercase">Ingredients</p>
+                <p className="text-sm font-extrabold text-white mt-0.5">{formatPeso(rawCost * multiplier)}</p>
+              </div>
+              <div className="bg-white/10 p-2 rounded-xl">
+                <p className="text-[10px] text-gray-300 font-semibold uppercase">Packaging</p>
+                <p className="text-sm font-extrabold text-white mt-0.5">{formatPeso(packCost * multiplier)}</p>
+              </div>
+              <div className="bg-white/10 p-2 rounded-xl">
+                <p className="text-[10px] text-gray-300 font-semibold uppercase">Overhead & Labor</p>
+                <p className="text-sm font-extrabold text-white mt-0.5">{formatPeso(laborCost + lpgCost + elecCost + otherCost)}</p>
+              </div>
+              <div className="bg-orange-500/20 border border-orange-500/40 p-2 rounded-xl">
+                <p className="text-[10px] text-orange-300 font-bold uppercase">Scaled Total</p>
+                <p className="text-sm font-extrabold text-orange-400 mt-0.5">{formatPeso((rawCost + packCost) * multiplier + laborCost + lpgCost + elecCost + otherCost)}</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+              <button
+                onClick={copyScaledShoppingList}
+                disabled={copiedToast}
+                className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  copiedToast ? 'bg-green-600 text-white' : 'bg-white/15 hover:bg-white/25 text-white active:scale-95'
+                }`}
+              >
+                {copiedToast ? '✅ Copied to Clipboard!' : '📋 Copy Scaled Shopping List'}
+              </button>
+
+              <button
+                onClick={saveScaledAsNewRecipe}
+                disabled={savedToast}
+                className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm ${
+                  savedToast ? 'bg-green-500 text-white' : 'bg-orange-600 hover:bg-orange-500 text-white active:scale-95'
+                }`}
+              >
+                {savedToast ? '✅ Saved as New Recipe!' : '💾 Save Scaled as New Recipe'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Appliances Used */}

@@ -1,6 +1,6 @@
 import { useApp, usePersistedActions } from './store';
 import { useAuth } from './lib/auth';
-import { isSupabaseConfigured } from './lib/supabase';
+import { isFirebaseConfigured } from './lib/firebase';
 import Dashboard from './components/Dashboard';
 import IngredientsList from './components/IngredientsList';
 import IngredientForm from './components/IngredientForm';
@@ -10,6 +10,8 @@ import RecipeForm from './components/RecipeForm';
 import SalesList from './components/SalesList';
 import SaleForm from './components/SaleForm';
 import OverheadSettingsView from './components/OverheadSettings';
+import PizzaMasterclass from './components/PizzaMasterclass';
+import MexicanMasterclass from './components/MexicanMasterclass';
 import AuthScreen from './components/AuthScreen';
 
 function AppContent() {
@@ -17,8 +19,8 @@ function AppContent() {
   const { user, loading, signOut } = useAuth();
   const { view } = state;
 
-  // Show auth screen if Supabase is configured but user not signed in
-  const showAuth = isSupabaseConfigured && !user;
+  // Show auth screen if Firebase is configured but user not signed in
+  const showAuth = isFirebaseConfigured && !user;
 
   if (showAuth) {
     if (loading) {
@@ -53,6 +55,19 @@ function AppContent() {
     'settings',
   ].includes(view);
 
+  const focusedView = [
+    'add-ingredient', 'edit-ingredient',
+    'add-recipe', 'edit-recipe',
+    'add-sale', 'edit-sale',
+    'settings',
+  ].includes(view);
+
+  const contentWidth = focusedView
+    ? 'max-w-4xl'
+    : view === 'recipe-detail'
+    ? 'max-w-5xl'
+    : 'max-w-7xl';
+
   function renderView() {
     switch (view) {
       case 'dashboard':
@@ -79,21 +94,58 @@ function AppContent() {
         return <SaleForm editId={state.selectedSaleId} />;
       case 'settings':
         return <OverheadSettingsView />;
+      case 'masterclass':
+        return <PizzaMasterclass />;
+      case 'mexican-masterclass':
+        return <MexicanMasterclass />;
       default:
         return <Dashboard />;
     }
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="bg-slate-50 h-[env(safe-area-inset-top)]" />
+    <div className="min-h-screen bg-slate-50 md:flex">
+      <DesktopSidebar activeTab={activeTab} view={view} onNavigate={(nextView) => dispatch({ type: 'SET_VIEW', view: nextView })} />
 
-      <main className={`max-w-lg mx-auto px-4 pt-4 ${showBottomNav ? 'pb-24' : 'pb-8'}`}>
-        {renderView()}
-      </main>
+      <div className="min-w-0 flex-1 md:ml-64">
+        <div className="bg-slate-50 h-[env(safe-area-inset-top)] md:hidden" />
+
+        <header className="sticky top-0 z-30 hidden h-16 items-center justify-between border-b border-slate-200/80 bg-white/90 px-6 backdrop-blur-xl md:flex lg:px-10">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-orange-600">KusinaCost Workspace</p>
+            <p className="text-sm text-slate-500">Food costing, production, and actual sales</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => dispatch({ type: 'SET_VIEW', view: 'add-sale' })}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              Record Sale
+            </button>
+            <button
+              onClick={() => dispatch({ type: 'SET_VIEW', view: 'add-recipe' })}
+              className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-orange-200 transition hover:bg-orange-700"
+            >
+              + New Recipe
+            </button>
+            {isFirebaseConfigured && user && (
+              <button
+                onClick={() => signOut()}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-500 transition hover:bg-slate-50"
+              >
+                {user.email?.split('@')[0]} · Sign out
+              </button>
+            )}
+          </div>
+        </header>
+
+        <main className={`${contentWidth} mx-auto px-4 pt-4 sm:px-6 md:px-8 md:py-8 lg:px-10 ${showBottomNav ? 'pb-24' : 'pb-8'}`}>
+          {renderView()}
+        </main>
+      </div>
 
       {showBottomNav && (
-        <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] z-40">
+        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-100 bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.06)] md:hidden">
           <div className="max-w-lg mx-auto flex items-stretch">
             <NavTab
               icon={
@@ -159,9 +211,9 @@ function AppContent() {
         </nav>
       )}
 
-      {/* User account pill — show in dashboard only when Supabase is configured */}
-      {isSupabaseConfigured && user && view === 'dashboard' && (
-        <div className="fixed top-2 right-2 z-30">
+      {/* User account pill — show in dashboard only when Firebase is configured */}
+      {isFirebaseConfigured && user && view === 'dashboard' && (
+        <div className="fixed top-2 right-2 z-30 md:hidden">
           <button
             onClick={() => signOut()}
             className="px-3 py-1.5 bg-white border border-gray-200 rounded-full text-xs text-gray-600 shadow-sm active:scale-95 transition-transform"
@@ -171,6 +223,76 @@ function AppContent() {
         </div>
       )}
     </div>
+  );
+}
+
+function DesktopSidebar({
+  activeTab,
+  view,
+  onNavigate,
+}: {
+  activeTab: string;
+  view: string;
+  onNavigate: (view: 'dashboard' | 'ingredients' | 'recipes' | 'sales' | 'settings' | 'masterclass' | 'mexican-masterclass') => void;
+}) {
+  const navItems = [
+    { id: 'home', view: 'dashboard' as const, label: 'Overview', icon: '⌂' },
+    { id: 'ingredients', view: 'ingredients' as const, label: 'Ingredients', icon: '◇' },
+    { id: 'recipes', view: 'recipes' as const, label: 'Recipes', icon: '▤' },
+    { id: 'sales', view: 'sales' as const, label: 'Sales', icon: '₱' },
+    { id: 'settings', view: 'settings' as const, label: 'Cost Settings', icon: '⚙' },
+  ];
+
+  return (
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-slate-200 bg-slate-950 text-white md:flex">
+      <div className="border-b border-white/10 px-6 py-6">
+        <p className="text-2xl font-extrabold tracking-tight">Kusina<span className="text-orange-400">Cost</span></p>
+        <p className="mt-1 text-xs text-slate-400">Know every peso in every plate.</p>
+      </div>
+
+      <nav className="flex-1 space-y-1 px-3 py-5">
+        <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Business</p>
+        {navItems.map((item) => {
+          const active = activeTab === item.id && view !== 'masterclass' && view !== 'mexican-masterclass';
+          return (
+            <button
+              key={item.id}
+              onClick={() => onNavigate(item.view)}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${
+                active ? 'bg-orange-600 text-white shadow-lg shadow-orange-950/40' : 'text-slate-300 hover:bg-white/8 hover:text-white'
+              }`}
+            >
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-base">{item.icon}</span>
+              {item.label}
+            </button>
+          );
+        })}
+
+        <p className="px-3 pb-2 pt-7 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Masterclasses</p>
+        <button
+          onClick={() => onNavigate('masterclass')}
+          className={`w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${view === 'masterclass' ? 'bg-amber-500 text-slate-950' : 'text-slate-300 hover:bg-white/8 hover:text-white'}`}
+        >
+          Pizza Making
+        </button>
+        <button
+          onClick={() => onNavigate('mexican-masterclass')}
+          className={`mt-1 w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${view === 'mexican-masterclass' ? 'bg-emerald-500 text-slate-950' : 'text-slate-300 hover:bg-white/8 hover:text-white'}`}
+        >
+          Flavors of Mexico
+        </button>
+      </nav>
+
+      <div className="border-t border-white/10 p-4">
+        <button
+          onClick={() => onNavigate('recipes')}
+          className="w-full rounded-xl bg-white/8 px-4 py-3 text-left text-xs text-slate-300 transition hover:bg-white/12"
+        >
+          <span className="block font-bold text-white">Production ready</span>
+          Cost, scale, price, and sell.
+        </button>
+      </div>
+    </aside>
   );
 }
 

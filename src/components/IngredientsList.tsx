@@ -23,11 +23,11 @@ export default function IngredientsList() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold text-gray-900">Ingredients</h1>
+          <h1 className="text-xl font-extrabold text-gray-900 md:text-3xl">Ingredients</h1>
           <p className="text-xs text-gray-500 mt-0.5">{ingredients.length} items tracked</p>
         </div>
         <button
@@ -39,7 +39,7 @@ export default function IngredientsList() {
       </div>
 
       {/* Search */}
-      <div className="relative">
+      <div className="relative md:max-w-xl">
         <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
         <input
           type="text"
@@ -75,17 +75,18 @@ export default function IngredientsList() {
           <p className="text-xs text-gray-500 mt-1">Try a different search or category</p>
         </div>
       ) : (
-        Object.entries(grouped).map(([category, items]) => (
+        <div className="grid items-start gap-5 xl:grid-cols-2">
+        {Object.entries(grouped).map(([category, items]) => (
           <div key={category}>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">{category}</p>
-            <div className="space-y-2">
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
               {items.map((ing) => {
                 const costPerUnit = getIngredientCostPerUnit(ing);
                 return (
                   <button
                     key={ing.id}
                     onClick={() => dispatch({ type: 'SET_VIEW', view: 'edit-ingredient', ingredientId: ing.id })}
-                    className="w-full bg-white rounded-2xl border border-gray-100 p-4 text-left active:scale-[0.98] transition-transform"
+                    className="w-full rounded-2xl border border-gray-100 bg-white p-4 text-left transition hover:-translate-y-0.5 hover:border-gray-200 hover:shadow-md active:scale-[0.98]"
                   >
                     <div className="flex items-center justify-between">
                       <div className="min-w-0 flex-1">
@@ -104,7 +105,8 @@ export default function IngredientsList() {
               })}
             </div>
           </div>
-        ))
+        ))}
+        </div>
       )}
     </div>
   );

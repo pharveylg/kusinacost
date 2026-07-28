@@ -44,7 +44,7 @@ export default function OverheadSettingsView() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 md:space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <button
@@ -54,7 +54,7 @@ export default function OverheadSettingsView() {
           ←
         </button>
         <div>
-          <h1 className="text-xl font-extrabold text-gray-900">Settings</h1>
+          <h1 className="text-xl font-extrabold text-gray-900 md:text-3xl">Settings</h1>
           <p className="text-xs text-gray-500">I-setup ang rates mo para accurate ang costing</p>
         </div>
       </div>

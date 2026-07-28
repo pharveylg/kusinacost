@@ -19,11 +19,11 @@ export default function SalesList() {
   const displayEntries = showAll ? dateEntries : dateEntries.slice(0, 5);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold text-gray-900">Sales</h1>
+          <h1 className="text-xl font-extrabold text-gray-900 md:text-3xl">Sales</h1>
           <p className="text-xs text-gray-500 mt-0.5">{sales.length} records</p>
         </div>
         <button
@@ -36,13 +36,13 @@ export default function SalesList() {
 
       {/* Overall Sales Summary Hero */}
       {sales.length > 0 && (
-        <div className="bg-gradient-to-br from-green-500 to-emerald-700 rounded-3xl p-5 text-white relative overflow-hidden">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-green-500 to-emerald-700 p-5 text-white md:p-8">
           <div className="absolute -top-6 -right-6 w-28 h-28 bg-white/10 rounded-full" />
           <div className="absolute -bottom-4 -right-10 w-20 h-20 bg-white/5 rounded-full" />
           <div className="relative">
             <p className="text-emerald-100 text-xs font-medium uppercase tracking-wider">Overall Sales Summary</p>
 
-            <div className="grid grid-cols-2 gap-3 mt-3">
+            <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-6">
               <div>
                 <p className="text-[10px] opacity-70 uppercase font-semibold">Revenue</p>
                 <p className="text-xl font-extrabold">{formatPeso(summary.totalRevenue)}</p>
@@ -97,10 +97,11 @@ export default function SalesList() {
       )}
 
       {/* Sales by Date */}
+      <div className="grid items-start gap-4 xl:grid-cols-2">
       {displayEntries.map(([date, dateSales]) => {
         const dateSummary = getOverallSalesSummary(dateSales, recipes, ingredients, settings);
         return (
-          <div key={date} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <div key={date} className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
             {/* Date Header */}
             <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -183,6 +184,7 @@ export default function SalesList() {
           </div>
         );
       })}
+      </div>
 
       {!showAll && dateEntries.length > 5 && (
         <button

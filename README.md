@@ -12,14 +12,14 @@ A mobile-first food costing app for small Filipino food businesses (karinderya, 
 - **Spoilage/Wastage** — Unsold servings tracked as ₱ loss
 - **Dashboard** — Sales summary hero, alerts for low-margin / loss-making recipes
 - **Mobile-First** — Bottom tab nav, touch-friendly forms, optimized for small screens
-- **Multi-User** — Optional Supabase auth so each small business owner has their own data
+- **Multi-User** — Optional Firebase auth so each small business owner has their own data
 - **Offline-First** — Works without backend using localStorage
 
 ## 🛠 Tech Stack
 
 - **Frontend**: React 19 + TypeScript + Vite
 - **Styling**: Tailwind CSS 4
-- **Backend**: Supabase (Postgres + Auth) — optional
+- **Backend**: Firebase (Firestore + Auth) — optional
 - **Hosting**: Vercel
 - **Build**: Single-file output via `vite-plugin-singlefile`
 
@@ -57,30 +57,42 @@ vercel --prod       # production deploy
 
 Vercel will use the included `vercel.json` for SPA rewrites (so client-side routing works on refresh).
 
-## 🗄 Set up Supabase (optional but recommended for multi-device / multi-user)
+## 🔥 Set up Firebase (optional but recommended for multi-device / multi-user)
 
-### 1. Create a Supabase project
-- Go to [supabase.com](https://supabase.com) → New project
-- Note your **Project URL** and **anon public key** from Settings → API
+Firebase's free "Spark" plan is generous and permanent: unlimited email/password users, 1GB Firestore storage, 50K document reads/day.
 
-### 2. Run the schema
-- In Supabase, go to **SQL Editor** → New query
-- Paste the contents of [`supabase/schema.sql`](./supabase/schema.sql)
-- Click **Run**
+### 1. Create a Firebase project
+1. Go to [console.firebase.google.com](https://console.firebase.google.com) → **Add project**
+2. Name it (e.g., `kusinacost`) — you can disable Google Analytics
+3. Once created, click the **Web icon (`</>`)** on the project overview page to register a web app
+4. Copy the config values shown (`apiKey`, `authDomain`, `projectId`)
 
-This creates 4 tables (`ingredients`, `recipes`, `sales`, `overhead_settings`) with row-level security so each user only sees their own data.
+### 2. Enable Email/Password Auth
+- In Firebase Console: **Build → Authentication → Get started**
+- Under **Sign-in method**, enable **Email/Password**
 
-### 3. Enable email auth
-- In Supabase: **Authentication** → Providers → Email (enabled by default)
+### 3. Create the Firestore database
+- In Firebase Console: **Build → Firestore Database → Create database**
+- Choose **Production mode** and a region close to your users (e.g., `asia-southeast1` for the Philippines)
 
-### 4. Configure environment variables
+### 4. Set security rules
+- Go to **Firestore Database → Rules**
+- Paste the contents of [`firebase/firestore.rules`](./firebase/firestore.rules)
+- Click **Publish**
+
+This ensures each signed-in user can only read/write their own data. No tables to create — Firestore collections are created automatically on first write.
+
+### 5. Configure environment variables
 
 In Vercel dashboard: **Settings → Environment Variables**, add:
 
 | Name | Value |
 |---|---|
-| `VITE_SUPABASE_URL` | `https://xxxxx.supabase.co` |
-| `VITE_SUPABASE_ANON_KEY` | `eyJhbGc...` (your anon key) |
+| `VITE_FIREBASE_API_KEY` | `AIzaSy...` |
+| `VITE_FIREBASE_AUTH_DOMAIN` | `your-project.firebaseapp.com` |
+| `VITE_FIREBASE_PROJECT_ID` | `your-project` |
+
+Then **redeploy** so the build picks up the variables.
 
 For local development, create `.env.local`:
 ```bash
@@ -90,8 +102,10 @@ cp .env.example .env.local
 
 Once configured, the app automatically:
 - Shows a Sign In / Sign Up screen on launch
-- Persists all data to Supabase (per-user)
+- Persists all data to Firestore (per-user, secured by rules)
 - Falls back to localStorage if env vars are missing (dev/demo mode)
+
+> **Note:** The Firebase web API key is safe to expose in client code — security is enforced by Firestore rules, not by hiding the key.
 
 ## 📁 Project Structure
 
@@ -99,15 +113,18 @@ Once configured, the app automatically:
 .
 ├── src/
 │   ├── components/         # React components (Dashboard, RecipeForm, etc.)
-│   ├── lib/                # Supabase client, auth, data service
+│   ├── lib/
+│   │   ├── firebase.ts     # Firebase client (graceful fallback if unconfigured)
+│   │   ├── auth.tsx        # Auth provider (Firebase Auth or no-op)
+│   │   └── dataService.ts  # Data layer (Firestore or localStorage)
 │   ├── App.tsx             # Main shell + bottom nav
 │   ├── main.tsx            # Entry point (AuthProvider + AppProvider)
 │   ├── store.tsx           # Global state, cost calculation helpers
 │   ├── types.ts            # TypeScript interfaces
 │   ├── index.css           # Tailwind imports
 │   └── vite-env.d.ts       # Vite env type defs
-├── supabase/
-│   └── schema.sql          # Database schema (run in Supabase SQL editor)
+├── firebase/
+│   └── firestore.rules     # Security rules (paste into Firebase Console)
 ├── vercel.json             # Vercel deployment config
 ├── .env.example            # Environment variable template
 ├── index.html              # HTML entry

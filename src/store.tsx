@@ -10,7 +10,7 @@ import type {
   AppState,
 } from './types';
 import { dataService } from './lib/dataService';
-import { isSupabaseConfigured } from './lib/supabase';
+import { isFirebaseConfigured } from './lib/firebase';
 import { useAuth } from './lib/auth';
 
 // ─── Default Overhead Settings (PH market 2024-2026) ───────────────────────
@@ -232,9 +232,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     async function hydrate() {
-      // When Supabase is configured, wait for auth to settle
-      if (isSupabaseConfigured && auth.loading) return;
-      if (isSupabaseConfigured && !userId) {
+      // When Firebase is configured, wait for auth to settle
+      if (isFirebaseConfigured && auth.loading) return;
+      if (isFirebaseConfigured && !userId) {
         // Authenticated, but no user — clear state
         if (!cancelled) {
           dispatch({
@@ -281,7 +281,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, [userId, auth.loading]);
 
-  // ─── Persist on changes (Supabase only — localStorage is handled inside dataService) ──
+  // ─── Persist on changes (backend writes are handled inside dataService) ──
   // We use a different approach: persist on every state change via the dataService.
   useEffect(() => {
     // Skip initial hydration trigger
@@ -300,7 +300,7 @@ export function useApp() {
 // ─── Persisted dispatch wrapper ───────────────────────────────────────────
 /**
  * Use this hook for any action that should persist to the backend.
- * It dispatches the action AND saves the relevant entity to Supabase/LocalStorage.
+ * It dispatches the action AND saves the relevant entity to Firestore/LocalStorage.
  */
 export function usePersistedActions() {
   const { state, dispatch } = useApp();

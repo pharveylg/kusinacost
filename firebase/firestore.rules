@@ -1,0 +1,20 @@
+rules_version = '2';
+
+// ─── KusinaCost Firestore Security Rules ──────────────────────────────────
+// Paste this in: Firebase Console → Firestore Database → Rules → Publish
+//
+// Data layout:
+//   users/{uid}/ingredients/{id}
+//   users/{uid}/recipes/{id}
+//   users/{uid}/sales/{id}
+//   users/{uid}/meta/overheadSettings
+//
+// Each signed-in user can only read/write documents under their own uid.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

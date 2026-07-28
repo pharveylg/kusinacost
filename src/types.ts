@@ -97,7 +97,9 @@ export type AppView =
   | 'sales'
   | 'add-sale'
   | 'edit-sale'
-  | 'settings';
+  | 'settings'
+  | 'masterclass'
+  | 'mexican-masterclass';
 
 export interface AppState {
   ingredients: Ingredient[];

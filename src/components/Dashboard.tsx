@@ -39,20 +39,20 @@ export default function Dashboard() {
   const latestDateEntry = [...groupedSales.entries()][0]; // first = most recent
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 md:space-y-7">
       {/* Hero Greeting */}
-      <div className="bg-gradient-to-br from-orange-500 to-orange-700 rounded-3xl p-5 text-white relative overflow-hidden">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-orange-500 to-orange-700 p-5 text-white md:p-8">
         <div className="absolute -top-6 -right-6 w-28 h-28 bg-white/10 rounded-full" />
         <div className="absolute -bottom-4 -right-10 w-20 h-20 bg-white/5 rounded-full" />
         <div className="relative">
           <p className="text-orange-100 text-sm font-medium">Magandang araw! 👋</p>
-          <h1 className="text-2xl font-extrabold mt-1 leading-tight">KusinaCost</h1>
-          <p className="text-orange-100 text-sm mt-1">Track your food costs, maximize your kita</p>
+          <h1 className="mt-1 text-2xl font-extrabold leading-tight md:text-4xl">KusinaCost</h1>
+          <p className="mt-1 text-sm text-orange-100 md:max-w-xl md:text-base">Track your food costs, understand actual sales, and maximize your kita.</p>
         </div>
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
         <StatCard emoji="🥘" label="Recipes" value={totalRecipes.toString()} sub="menu items" bg="bg-amber-50" border="border-amber-100" />
         <StatCard emoji="🧅" label="Ingredients" value={totalIngredients.toString()} sub="tracked items" bg="bg-green-50" border="border-green-100" />
         <StatCard
@@ -75,7 +75,7 @@ export default function Dashboard() {
 
       {/* Sales Summary Hero Callout */}
       {sales.length > 0 && (
-        <div className="bg-gradient-to-br from-green-500 to-emerald-700 rounded-3xl p-5 text-white relative overflow-hidden">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-green-500 to-emerald-700 p-5 text-white md:p-7">
           <div className="absolute -top-6 -right-6 w-28 h-28 bg-white/10 rounded-full" />
           <div className="absolute -bottom-4 -right-10 w-20 h-20 bg-white/5 rounded-full" />
           <div className="relative">
@@ -170,7 +170,7 @@ export default function Dashboard() {
               View All →
             </button>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white md:shadow-sm">
             <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
               <span className="text-sm">📅</span>
               <span className="text-xs font-bold text-gray-700">{formatDate(latestDateEntry[0])}</span>
@@ -221,7 +221,7 @@ export default function Dashboard() {
             </button>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="grid gap-3 lg:grid-cols-2">
             {recipes.slice(0, 5).map((recipe) => {
               const totalCost = getRecipeTotalCost(recipe, ingredients, settings);
               const costPerServing = getRecipeCostPerServing(recipe, ingredients, settings);
@@ -271,11 +271,63 @@ export default function Dashboard() {
         )}
       </div>
 
+      {/* Masterclass Guides Section */}
+      <div>
+        <h2 className="text-base font-bold text-gray-900 mb-3">Chef Masterclasses & Guides</h2>
+        <div className="grid gap-3 lg:grid-cols-2">
+          {/* Pizza Masterclass Banner */}
+          <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-red-600 rounded-3xl p-4 text-white relative overflow-hidden shadow-md shadow-orange-200">
+            <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-white/10 rounded-full blur-lg" />
+            <div className="relative flex items-center justify-between gap-3">
+              <div>
+                <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 backdrop-blur-md rounded-full text-[9px] font-extrabold uppercase tracking-wider mb-1">
+                  <span>👨‍🍳 Chef EJ Masterclass</span>
+                </div>
+                <h3 className="text-base font-extrabold leading-tight">Pizza Making Guide & Ratios</h3>
+                <p className="text-xs text-orange-100 mt-0.5">
+                  Dough stages, poolish preferments, artisan sauces & costing
+                </p>
+              </div>
+              <button
+                onClick={() => dispatch({ type: 'SET_VIEW', view: 'masterclass' })}
+                className="px-3.5 py-2 bg-white text-orange-700 text-xs font-extrabold rounded-xl shrink-0 shadow-sm hover:bg-orange-50 active:scale-95 transition-all"
+              >
+                Open Guide &rarr;
+              </button>
+            </div>
+          </div>
+
+          {/* Mexican Masterclass Banner */}
+          <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-red-700 rounded-3xl p-4 text-white relative overflow-hidden shadow-md shadow-emerald-200">
+            <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-white/10 rounded-full blur-lg" />
+            <div className="relative flex items-center justify-between gap-3">
+              <div>
+                <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 backdrop-blur-md rounded-full text-[9px] font-extrabold uppercase tracking-wider mb-1">
+                  <span>👨‍🍳 Chef Michael Navarra</span>
+                </div>
+                <h3 className="text-base font-extrabold leading-tight">Flavors of Mexico Guide</h3>
+                <p className="text-xs text-emerald-100 mt-0.5">
+                  Birria, Barbacoa, Asada, 3 Salsas, Guacamole & exact spice ratios
+                </p>
+              </div>
+              <button
+                onClick={() => dispatch({ type: 'SET_VIEW', view: 'mexican-masterclass' })}
+                className="px-3.5 py-2 bg-white text-emerald-800 text-xs font-extrabold rounded-xl shrink-0 shadow-sm hover:bg-emerald-50 active:scale-95 transition-all"
+              >
+                Open Guide &rarr;
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Quick Actions */}
       <div>
         <h2 className="text-base font-bold text-gray-900 mb-3">Quick Actions</h2>
-        <div className="grid grid-cols-4 gap-3">
-          <QuickAction emoji="📝" label="Recipe" onClick={() => dispatch({ type: 'SET_VIEW', view: 'add-recipe' })} />
+        <div className="grid grid-cols-3 gap-2.5 lg:grid-cols-6">
+          <QuickAction emoji="🍕" label="Pizza Guide" onClick={() => dispatch({ type: 'SET_VIEW', view: 'masterclass' })} />
+          <QuickAction emoji="🌮" label="Mexican Guide" onClick={() => dispatch({ type: 'SET_VIEW', view: 'mexican-masterclass' })} />
+          <QuickAction emoji="📝" label="New Recipe" onClick={() => dispatch({ type: 'SET_VIEW', view: 'add-recipe' })} />
           <QuickAction emoji="🧺" label="Ingredient" onClick={() => dispatch({ type: 'SET_VIEW', view: 'add-ingredient' })} />
           <QuickAction emoji="💰" label="Record Sale" onClick={() => dispatch({ type: 'SET_VIEW', view: 'add-sale' })} />
           <QuickAction emoji="⚙️" label="Settings" onClick={() => dispatch({ type: 'SET_VIEW', view: 'settings' })} />
@@ -289,12 +341,12 @@ function StatCard({ emoji, label, value, sub, bg, border }: {
   emoji: string; label: string; value: string; sub: string; bg: string; border: string;
 }) {
   return (
-    <div className={`${bg} ${border} border rounded-2xl p-4`}>
+    <div className={`${bg} ${border} rounded-2xl border p-4 md:p-5`}>
       <div className="flex items-center gap-2 mb-2">
         <span className="text-lg">{emoji}</span>
         <span className="text-xs font-semibold text-gray-500 uppercase">{label}</span>
       </div>
-      <p className="text-2xl font-extrabold text-gray-900">{value}</p>
+      <p className="text-2xl font-extrabold text-gray-900 md:text-3xl">{value}</p>
       <p className="text-xs text-gray-500 mt-0.5 truncate">{sub}</p>
     </div>
   );

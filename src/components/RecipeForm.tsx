@@ -148,7 +148,7 @@ export default function RecipeForm({ editId }: Props) {
   );
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 md:space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <button
@@ -158,7 +158,7 @@ export default function RecipeForm({ editId }: Props) {
           ←
         </button>
         <div>
-          <h1 className="text-xl font-extrabold text-gray-900">{isEdit ? 'Edit' : 'New'} Recipe</h1>
+          <h1 className="text-xl font-extrabold text-gray-900 md:text-3xl">{isEdit ? 'Edit' : 'New'} Recipe</h1>
           <p className="text-xs text-gray-500">{isEdit ? 'Update recipe details' : 'Build your recipe costing'}</p>
         </div>
       </div>

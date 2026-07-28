@@ -51,7 +51,7 @@ export default function IngredientForm({ editId }: Props) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 md:space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <button
@@ -61,7 +61,7 @@ export default function IngredientForm({ editId }: Props) {
           ←
         </button>
         <div>
-          <h1 className="text-xl font-extrabold text-gray-900">{isEdit ? 'Edit' : 'Add'} Ingredient</h1>
+          <h1 className="text-xl font-extrabold text-gray-900 md:text-3xl">{isEdit ? 'Edit' : 'Add'} Ingredient</h1>
           <p className="text-xs text-gray-500">{isEdit ? 'Update details below' : 'Enter ingredient details'}</p>
         </div>
       </div>

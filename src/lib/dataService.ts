@@ -1,17 +1,37 @@
-import { supabase, isSupabaseConfigured } from './supabase';
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  setDoc,
+  deleteDoc,
+} from 'firebase/firestore';
+import { firestore, isFirebaseConfigured } from './firebase';
 import type { Ingredient, Recipe, SaleRecord, OverheadSettings } from '../types';
 
-// ─── Data Service: abstracts localStorage vs Supabase ────────────────────
+// ─── Data Service: abstracts localStorage vs Firebase Firestore ──────────
 //
-// - When Supabase IS configured: all writes go to Supabase, reads fetch fresh.
-// - When NOT configured: fall back to localStorage (single-user local mode).
+// Firestore layout (per-user isolation baked into the path):
+//   users/{uid}/ingredients/{id}
+//   users/{uid}/recipes/{id}
+//   users/{uid}/sales/{id}
+//   users/{uid}/meta/overheadSettings
 //
-// The store uses this service for persistence so the UI code stays the same.
+// - When Firebase IS configured: all writes go to Firestore.
+// - When NOT configured: falls back to localStorage (single-user local mode).
 
 type UserId = string | null;
 
 function lsKey(userId: UserId) {
   return userId ? `kusinacost_data_${userId}` : 'kusinacost_data_v4';
+}
+
+function userCol(userId: string, name: string) {
+  return collection(firestore!, 'users', userId, name);
+}
+
+function userDoc(userId: string, name: string, id: string) {
+  return doc(firestore!, 'users', userId, name, id);
 }
 
 export const dataService = {
@@ -21,20 +41,26 @@ export const dataService = {
     sales: SaleRecord[];
     overheadSettings: OverheadSettings | null;
   }> {
-    if (isSupabaseConfigured && supabase && userId) {
-      const [ings, recs, salesRes, settingsRes] = await Promise.all([
-        supabase.from('ingredients').select('*').eq('user_id', userId),
-        supabase.from('recipes').select('*').eq('user_id', userId),
-        supabase.from('sales').select('*').eq('user_id', userId).order('date', { ascending: false }),
-        supabase.from('overhead_settings').select('*').eq('user_id', userId).maybeSingle(),
+    if (isFirebaseConfigured && firestore && userId) {
+      const [ingsSnap, recsSnap, salesSnap, settingsSnap] = await Promise.all([
+        getDocs(userCol(userId, 'ingredients')),
+        getDocs(userCol(userId, 'recipes')),
+        getDocs(userCol(userId, 'sales')),
+        getDoc(userDoc(userId, 'meta', 'overheadSettings')),
       ]);
+
       return {
-        ingredients: (ings.data || []).map(mapIngredient),
-        recipes: (recs.data || []).map(mapRecipe),
-        sales: (salesRes.data || []).map(mapSale),
-        overheadSettings: settingsRes.data ? mapSettings(settingsRes.data) : null,
+        ingredients: ingsSnap.docs.map((d) => d.data() as Ingredient),
+        recipes: recsSnap.docs.map((d) => d.data() as Recipe),
+        sales: salesSnap.docs
+          .map((d) => d.data() as SaleRecord)
+          .sort((a, b) => b.date.localeCompare(a.date)),
+        overheadSettings: settingsSnap.exists()
+          ? (settingsSnap.data() as OverheadSettings)
+          : null,
       };
     }
+
     // LocalStorage mode
     try {
       const raw = localStorage.getItem(lsKey(userId));
@@ -55,21 +81,10 @@ export const dataService = {
 
   // ─── Ingredient ops ───────────────────────────────────────────────────
   async saveIngredient(ingredient: Ingredient, userId: UserId): Promise<void> {
-    if (isSupabaseConfigured && supabase && userId) {
-      const row = {
-        id: ingredient.id,
-        user_id: userId,
-        name: ingredient.name,
-        purchase_price: ingredient.purchasePrice,
-        purchase_qty: ingredient.purchaseQty,
-        purchase_unit: ingredient.purchaseUnit,
-        category: ingredient.category,
-      };
-      const { error } = await supabase.from('ingredients').upsert(row);
-      if (error) throw error;
+    if (isFirebaseConfigured && firestore && userId) {
+      await setDoc(userDoc(userId, 'ingredients', ingredient.id), ingredient);
       return;
     }
-    // local
     const all = await dataService.loadInitial(userId);
     const list = all.ingredients.some((i) => i.id === ingredient.id)
       ? all.ingredients.map((i) => (i.id === ingredient.id ? ingredient : i))
@@ -78,9 +93,8 @@ export const dataService = {
   },
 
   async deleteIngredient(id: string, userId: UserId): Promise<void> {
-    if (isSupabaseConfigured && supabase && userId) {
-      const { error } = await supabase.from('ingredients').delete().eq('id', id).eq('user_id', userId);
-      if (error) throw error;
+    if (isFirebaseConfigured && firestore && userId) {
+      await deleteDoc(userDoc(userId, 'ingredients', id));
       return;
     }
     const all = await dataService.loadInitial(userId);
@@ -89,20 +103,8 @@ export const dataService = {
 
   // ─── Recipe ops ───────────────────────────────────────────────────────
   async saveRecipe(recipe: Recipe, userId: UserId): Promise<void> {
-    if (isSupabaseConfigured && supabase && userId) {
-      const row = {
-        id: recipe.id,
-        user_id: userId,
-        name: recipe.name,
-        category: recipe.category,
-        servings: recipe.servings,
-        selling_price: recipe.sellingPrice,
-        ingredients: recipe.ingredients,
-        overhead: recipe.overhead,
-        notes: recipe.notes,
-      };
-      const { error } = await supabase.from('recipes').upsert(row);
-      if (error) throw error;
+    if (isFirebaseConfigured && firestore && userId) {
+      await setDoc(userDoc(userId, 'recipes', recipe.id), recipe);
       return;
     }
     const all = await dataService.loadInitial(userId);
@@ -113,9 +115,8 @@ export const dataService = {
   },
 
   async deleteRecipe(id: string, userId: UserId): Promise<void> {
-    if (isSupabaseConfigured && supabase && userId) {
-      const { error } = await supabase.from('recipes').delete().eq('id', id).eq('user_id', userId);
-      if (error) throw error;
+    if (isFirebaseConfigured && firestore && userId) {
+      await deleteDoc(userDoc(userId, 'recipes', id));
       return;
     }
     const all = await dataService.loadInitial(userId);
@@ -124,20 +125,8 @@ export const dataService = {
 
   // ─── Sale ops ─────────────────────────────────────────────────────────
   async saveSale(sale: SaleRecord, userId: UserId): Promise<void> {
-    if (isSupabaseConfigured && supabase && userId) {
-      const row = {
-        id: sale.id,
-        user_id: userId,
-        recipe_id: sale.recipeId,
-        date: sale.date,
-        batches_made: sale.batchesMade,
-        servings_sold: sale.servingsSold,
-        servings_wasted: sale.servingsWasted,
-        notes: sale.notes,
-        created_at: sale.createdAt,
-      };
-      const { error } = await supabase.from('sales').upsert(row);
-      if (error) throw error;
+    if (isFirebaseConfigured && firestore && userId) {
+      await setDoc(userDoc(userId, 'sales', sale.id), sale);
       return;
     }
     const all = await dataService.loadInitial(userId);
@@ -148,9 +137,8 @@ export const dataService = {
   },
 
   async deleteSale(id: string, userId: UserId): Promise<void> {
-    if (isSupabaseConfigured && supabase && userId) {
-      const { error } = await supabase.from('sales').delete().eq('id', id).eq('user_id', userId);
-      if (error) throw error;
+    if (isFirebaseConfigured && firestore && userId) {
+      await deleteDoc(userDoc(userId, 'sales', id));
       return;
     }
     const all = await dataService.loadInitial(userId);
@@ -159,19 +147,8 @@ export const dataService = {
 
   // ─── Overhead Settings ────────────────────────────────────────────────
   async saveOverheadSettings(settings: OverheadSettings, userId: UserId): Promise<void> {
-    if (isSupabaseConfigured && supabase && userId) {
-      const row = {
-        user_id: userId,
-        lpg_tank_price: settings.lpgTankPrice,
-        lpg_tank_kg: settings.lpgTankKg,
-        lpg_burn_rate_kg_per_hr: settings.lpgBurnRateKgPerHr,
-        electricity_per_kwh: settings.electricityPerKwh,
-        labor_rate_per_hour: settings.laborRatePerHour,
-        packaging_per_serving: settings.packagingPerServing,
-        updated_at: new Date().toISOString(),
-      };
-      const { error } = await supabase.from('overhead_settings').upsert(row);
-      if (error) throw error;
+    if (isFirebaseConfigured && firestore && userId) {
+      await setDoc(userDoc(userId, 'meta', 'overheadSettings'), settings);
       return;
     }
     await persistLocal(userId, { overheadSettings: settings });
@@ -192,52 +169,4 @@ async function persistLocal(
     overheadSettings: patch.overheadSettings ?? all.overheadSettings,
   };
   localStorage.setItem(lsKey(userId), JSON.stringify(merged));
-}
-
-function mapIngredient(r: any): Ingredient {
-  return {
-    id: r.id,
-    name: r.name,
-    purchasePrice: Number(r.purchase_price),
-    purchaseQty: Number(r.purchase_qty),
-    purchaseUnit: r.purchase_unit,
-    category: r.category,
-  };
-}
-
-function mapRecipe(r: any): Recipe {
-  return {
-    id: r.id,
-    name: r.name,
-    category: r.category,
-    servings: r.servings,
-    sellingPrice: Number(r.selling_price),
-    ingredients: r.ingredients || [],
-    overhead: r.overhead || {},
-    notes: r.notes || '',
-  };
-}
-
-function mapSale(r: any): SaleRecord {
-  return {
-    id: r.id,
-    recipeId: r.recipe_id,
-    date: r.date,
-    batchesMade: r.batches_made,
-    servingsSold: r.servings_sold,
-    servingsWasted: r.servings_wasted,
-    notes: r.notes || '',
-    createdAt: r.created_at,
-  };
-}
-
-function mapSettings(r: any): OverheadSettings {
-  return {
-    lpgTankPrice: Number(r.lpg_tank_price),
-    lpgTankKg: Number(r.lpg_tank_kg),
-    lpgBurnRateKgPerHr: Number(r.lpg_burn_rate_kg_per_hr),
-    electricityPerKwh: Number(r.electricity_per_kwh),
-    laborRatePerHour: Number(r.labor_rate_per_hour),
-    packagingPerServing: Number(r.packaging_per_serving),
-  };
 }
