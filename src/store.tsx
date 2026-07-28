@@ -264,13 +264,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         data.recipes.length === 0 &&
         data.sales.length === 0;
 
+      const hydratedGuideAccess = ensureAdmin(data.guideAccess || {}, auth.user?.email);
       dispatch({
         type: 'HYDRATE',
         ingredients: isFirstTime ? sampleIngredients : data.ingredients,
         recipes: isFirstTime ? sampleRecipes : data.recipes,
         sales: data.sales,
         overheadSettings: data.overheadSettings || defaultOverheadSettings,
-        guideAccess: data.guideAccess || {},
+        guideAccess: hydratedGuideAccess,
       });
 
       // Persist sample data so it shows up next time
@@ -282,6 +283,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
           await dataService.saveRecipe(rec, userId);
         }
         await dataService.saveOverheadSettings(defaultOverheadSettings, userId);
+      }
+
+      // Persist admin list if it was just initialized
+      if (hydratedGuideAccess['_admins'] && !data.guideAccess?._admins) {
+        await dataService.saveGuideAccess(hydratedGuideAccess, userId);
       }
     }
 
@@ -384,6 +390,22 @@ export const GUIDE_DEFS = [
   { id: 'chef-ej-masterclass', label: '🍔 Chef EJ Recipes' },
 ] as const;
 
+const ADMIN_KEY = '_admins';
+
+/** Get the list of admin emails from guideAccess */
+export function getAdminEmails(guideAccess: GuideAccessMap): string[] {
+  return guideAccess[ADMIN_KEY] || [];
+}
+
+/** Returns true if the current user is an admin (can manage guide access) */
+export function isAdmin(guideAccess: GuideAccessMap, userEmail: string | null | undefined): boolean {
+  const admins = getAdminEmails(guideAccess);
+  // If no admins configured yet, the first user who logs in while Firebase is enabled becomes admin
+  if (admins.length === 0 && userEmail) return true;
+  if (!userEmail) return false;
+  return admins.some((email) => email.toLowerCase().trim() === userEmail.toLowerCase().trim());
+}
+
 /** Returns true if the current user can view the given guide */
 export function canAccessGuide(guideId: string, guideAccess: GuideAccessMap, userEmail: string | null | undefined): boolean {
   const allowedList = guideAccess[guideId];
@@ -392,6 +414,15 @@ export function canAccessGuide(guideId: string, guideAccess: GuideAccessMap, use
   // Must match an email in the list
   if (!userEmail) return false;
   return allowedList.some((email) => email.toLowerCase().trim() === userEmail.toLowerCase().trim());
+}
+
+/** Initialize admin list with the first user if empty */
+export function ensureAdmin(guideAccess: GuideAccessMap, userEmail: string | null | undefined): GuideAccessMap {
+  const admins = getAdminEmails(guideAccess);
+  if (admins.length === 0 && userEmail) {
+    return { ...guideAccess, [ADMIN_KEY]: [userEmail.toLowerCase().trim()] };
+  }
+  return guideAccess;
 }
 
 // ─── Cost Calculation Helpers ──────────────────────────────────────────────

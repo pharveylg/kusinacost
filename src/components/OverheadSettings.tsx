@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useApp, usePersistedActions, formatPeso, defaultOverheadSettings, GUIDE_DEFS } from '../store';
+import { useApp, usePersistedActions, formatPeso, defaultOverheadSettings, GUIDE_DEFS, isAdmin } from '../store';
 import type { OverheadSettings, GuideAccessMap } from '../types';
+import { useAuth } from '../lib/auth';
 
 export default function OverheadSettingsView() {
   const { state, dispatch } = useApp();
@@ -198,7 +199,10 @@ export default function OverheadSettingsView() {
 function GuideAccessSection() {
   const { state } = useApp();
   const actions = usePersistedActions();
+  const auth = useAuth();
   const guideAccess = state.guideAccess || {};
+  const userEmail = auth.user?.email;
+  const userIsAdmin = isAdmin(guideAccess, userEmail);
   const [savedMsg, setSavedMsg] = useState(false);
   const [newEmails, setNewEmails] = useState<Record<string, string>>({});
 
@@ -243,10 +247,19 @@ function GuideAccessSection() {
         <div>
           <p className="text-sm font-bold text-gray-900">Guide Access Control</p>
           <p className="text-[10px] text-gray-500">
-            Restrict masterclass guides to specific email addresses. Leave empty to allow everyone.
+            {userIsAdmin
+              ? 'Restrict masterclass guides to specific email addresses. Leave empty to allow everyone.'
+              : 'Only account owners can manage guide access.'}
           </p>
         </div>
+        {userIsAdmin && <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold rounded-full">Admin</span>}
       </div>
+
+      {!userIsAdmin && (
+        <div className="bg-gray-50 rounded-xl p-4 text-center text-sm text-gray-500">
+          🔒 Guide access can only be managed by account owners. Request access changes from your admin.
+        </div>
+      )}
 
       {savedMsg && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-2 text-xs text-green-700 text-center font-semibold">
@@ -254,7 +267,7 @@ function GuideAccessSection() {
         </div>
       )}
 
-      {GUIDE_DEFS.map((guide) => {
+      {userIsAdmin && GUIDE_DEFS.map((guide) => {
         const emails = getEmails(guide.id);
         const isRestricted = emails.length > 0;
         return (
