@@ -22,6 +22,17 @@ function AppContent() {
   // Show auth screen if Firebase is configured but user not signed in
   const showAuth = isFirebaseConfigured && !user;
 
+  // Diagnostic banner — helps confirm whether Firebase env vars actually
+  // made it into this build. If this shows up, the app is running in
+  // local-only mode and login will never appear.
+  const firebaseWarningBanner = !isFirebaseConfigured && (
+    <div className="fixed top-0 inset-x-0 z-50 bg-red-600 text-white text-xs sm:text-sm font-semibold text-center py-2 px-3">
+      ⚠️ Firebase is not configured in this deployment — running in local-only mode (no login). Add
+      VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID in Vercel → Settings → Environment
+      Variables, then redeploy.
+    </div>
+  );
+
   if (showAuth) {
     if (loading) {
       return (
@@ -105,9 +116,10 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-slate-50 md:flex">
+      {firebaseWarningBanner}
       <DesktopSidebar activeTab={activeTab} view={view} onNavigate={(nextView) => dispatch({ type: 'SET_VIEW', view: nextView })} />
 
-      <div className="min-w-0 flex-1 md:ml-64">
+      <div className={`min-w-0 flex-1 md:ml-64 ${!isFirebaseConfigured ? 'pt-9 sm:pt-8' : ''}`}>
         <div className="bg-slate-50 h-[env(safe-area-inset-top)] md:hidden" />
 
         <header className="sticky top-0 z-30 hidden h-16 items-center justify-between border-b border-slate-200/80 bg-white/90 px-6 backdrop-blur-xl md:flex lg:px-10">

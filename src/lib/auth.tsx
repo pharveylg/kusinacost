@@ -3,6 +3,8 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut as fbSignOut,
   type User,
 } from 'firebase/auth';
@@ -19,6 +21,7 @@ interface AuthContextValue {
   configured: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
+  signInWithGoogle: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -43,8 +46,12 @@ function friendlyError(code: string): string {
       return 'Invalid email address.';
     case 'auth/too-many-requests':
       return 'Too many attempts. Please wait a moment and try again.';
+    case 'auth/unauthorized-domain':
+      return 'This domain is not authorized in Firebase. Add it under Authentication → Settings → Authorized domains.';
+    case 'auth/popup-blocked':
+      return 'Popup was blocked by your browser. Please allow popups and try again.';
     default:
-      return 'Something went wrong. Please try again.';
+      return `Something went wrong (${code || 'unknown error'}). Please try again.`;
   }
 }
 
@@ -86,13 +93,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function signInWithGoogle() {
+    if (!firebaseAuth) return { error: 'Firebase not configured' };
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(firebaseAuth, provider);
+      return { error: null };
+    } catch (e: any) {
+      if (e?.code === 'auth/popup-closed-by-user') {
+        return { error: null };
+      }
+      return { error: friendlyError(e?.code || '') };
+    }
+  }
+
   async function signOut() {
     if (!firebaseAuth) return;
     await fbSignOut(firebaseAuth);
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, configured: isFirebaseConfigured, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, loading, configured: isFirebaseConfigured, signIn, signUp, signInWithGoogle, signOut }}>
       {children}
     </AuthContext.Provider>
   );
