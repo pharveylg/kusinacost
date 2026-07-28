@@ -6,6 +6,7 @@ import type {
   ApplianceUsage,
   OverheadSettings,
   SaleRecord,
+  GuideAccessMap,
   AppView,
   AppState,
 } from './types';
@@ -152,7 +153,7 @@ const sampleRecipes: Recipe[] = [
 // ─── Actions ───────────────────────────────────────────────────────────────
 type Action =
   | { type: 'SET_VIEW'; view: AppView; recipeId?: string; ingredientId?: string; saleId?: string }
-  | { type: 'HYDRATE'; ingredients: Ingredient[]; recipes: Recipe[]; sales: SaleRecord[]; overheadSettings: OverheadSettings }
+  | { type: 'HYDRATE'; ingredients: Ingredient[]; recipes: Recipe[]; sales: SaleRecord[]; overheadSettings: OverheadSettings; guideAccess: GuideAccessMap }
   | { type: 'ADD_INGREDIENT'; ingredient: Ingredient }
   | { type: 'UPDATE_INGREDIENT'; ingredient: Ingredient }
   | { type: 'DELETE_INGREDIENT'; id: string }
@@ -162,7 +163,8 @@ type Action =
   | { type: 'UPDATE_OVERHEAD_SETTINGS'; settings: OverheadSettings }
   | { type: 'ADD_SALE'; sale: SaleRecord }
   | { type: 'UPDATE_SALE'; sale: SaleRecord }
-  | { type: 'DELETE_SALE'; id: string };
+  | { type: 'DELETE_SALE'; id: string }
+  | { type: 'UPDATE_GUIDE_ACCESS'; guideAccess: GuideAccessMap };
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -181,6 +183,7 @@ function reducer(state: AppState, action: Action): AppState {
         recipes: action.recipes,
         sales: action.sales,
         overheadSettings: action.overheadSettings,
+        guideAccess: action.guideAccess,
       };
     case 'ADD_INGREDIENT':
       return { ...state, ingredients: [...state.ingredients, action.ingredient] };
@@ -202,6 +205,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, sales: state.sales.map((s) => (s.id === action.sale.id ? action.sale : s)) };
     case 'DELETE_SALE':
       return { ...state, sales: state.sales.filter((s) => s.id !== action.id) };
+    case 'UPDATE_GUIDE_ACCESS':
+      return { ...state, guideAccess: action.guideAccess };
     default:
       return state;
   }
@@ -212,6 +217,7 @@ const initialState: AppState = {
   recipes: sampleRecipes,
   sales: [],
   overheadSettings: defaultOverheadSettings,
+  guideAccess: {},
   view: 'dashboard',
   selectedRecipeId: null,
   selectedIngredientId: null,
@@ -243,6 +249,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             recipes: [],
             sales: [],
             overheadSettings: defaultOverheadSettings,
+            guideAccess: {},
           });
         }
         return;
@@ -263,6 +270,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         recipes: isFirstTime ? sampleRecipes : data.recipes,
         sales: data.sales,
         overheadSettings: data.overheadSettings || defaultOverheadSettings,
+        guideAccess: data.guideAccess || {},
       });
 
       // Persist sample data so it shows up next time
@@ -347,6 +355,10 @@ export function usePersistedActions() {
     dispatch({ type: 'UPDATE_OVERHEAD_SETTINGS', settings });
     try { await dataService.saveOverheadSettings(settings, userId); } catch (e) { console.error(e); }
   }
+  async function updateGuideAccess(guideAccess: GuideAccessMap) {
+    dispatch({ type: 'UPDATE_GUIDE_ACCESS', guideAccess });
+    try { await dataService.saveGuideAccess(guideAccess, userId); } catch (e) { console.error(e); }
+  }
 
   return {
     state,
@@ -361,7 +373,25 @@ export function usePersistedActions() {
     updateSale,
     deleteSale,
     updateOverheadSettings,
+    updateGuideAccess,
   };
+}
+
+// ─── Guide Access Helper ──────────────────────────────────────────────────
+export const GUIDE_DEFS = [
+  { id: 'masterclass', label: '🍕 Pizza Making (Chef EJ)' },
+  { id: 'mexican-masterclass', label: '🌮 Flavors of Mexico (Chef Michael)' },
+  { id: 'chef-ej-masterclass', label: '🍔 Chef EJ Recipes' },
+] as const;
+
+/** Returns true if the current user can view the given guide */
+export function canAccessGuide(guideId: string, guideAccess: GuideAccessMap, userEmail: string | null | undefined): boolean {
+  const allowedList = guideAccess[guideId];
+  // No restriction configured → everyone can access
+  if (!allowedList || allowedList.length === 0) return true;
+  // Must match an email in the list
+  if (!userEmail) return false;
+  return allowedList.some((email) => email.toLowerCase().trim() === userEmail.toLowerCase().trim());
 }
 
 // ─── Cost Calculation Helpers ──────────────────────────────────────────────

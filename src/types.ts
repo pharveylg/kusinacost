@@ -102,11 +102,17 @@ export type AppView =
   | 'mexican-masterclass'
   | 'chef-ej-masterclass';
 
+// ─── Guide Access Control ───────────────────────────────────────────────────
+// Maps guide view name → array of allowed email addresses.
+// Empty array or missing key = everyone can access (no restriction).
+export type GuideAccessMap = Record<string, string[]>;
+
 export interface AppState {
   ingredients: Ingredient[];
   recipes: Recipe[];
   overheadSettings: OverheadSettings;
   sales: SaleRecord[];
+  guideAccess: GuideAccessMap;
   view: AppView;
   selectedRecipeId: string | null;
   selectedIngredientId: string | null;

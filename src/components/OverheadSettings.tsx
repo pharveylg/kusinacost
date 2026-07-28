@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useApp, usePersistedActions, formatPeso, defaultOverheadSettings } from '../store';
-import type { OverheadSettings } from '../types';
+import { useApp, usePersistedActions, formatPeso, defaultOverheadSettings, GUIDE_DEFS } from '../store';
+import type { OverheadSettings, GuideAccessMap } from '../types';
 
 export default function OverheadSettingsView() {
   const { state, dispatch } = useApp();
@@ -177,6 +177,9 @@ export default function OverheadSettingsView() {
         </div>
       </div>
 
+      {/* ─── Guide Access Control ─── */}
+      <GuideAccessSection />
+
       {/* Actions */}
       <div className="space-y-3">
         <button onClick={handleSave}
@@ -188,6 +191,122 @@ export default function OverheadSettingsView() {
           ↩️ Reset to Defaults
         </button>
       </div>
+    </div>
+  );
+}
+
+function GuideAccessSection() {
+  const { state } = useApp();
+  const actions = usePersistedActions();
+  const guideAccess = state.guideAccess || {};
+  const [savedMsg, setSavedMsg] = useState(false);
+  const [newEmails, setNewEmails] = useState<Record<string, string>>({});
+
+  function getEmails(guideId: string): string[] {
+    return guideAccess[guideId] || [];
+  }
+
+  function addEmail(guideId: string) {
+    const email = (newEmails[guideId] || '').trim().toLowerCase();
+    if (!email || !email.includes('@')) return;
+    const current = getEmails(guideId);
+    if (current.includes(email)) return;
+    const updated: GuideAccessMap = { ...guideAccess, [guideId]: [...current, email] };
+    actions.updateGuideAccess(updated);
+    setNewEmails((prev) => ({ ...prev, [guideId]: '' }));
+    flashSaved();
+  }
+
+  function removeEmail(guideId: string, email: string) {
+    const current = getEmails(guideId);
+    const updated: GuideAccessMap = { ...guideAccess, [guideId]: current.filter((e) => e !== email) };
+    actions.updateGuideAccess(updated);
+    flashSaved();
+  }
+
+  function clearRestriction(guideId: string) {
+    const updated: GuideAccessMap = { ...guideAccess };
+    delete updated[guideId];
+    actions.updateGuideAccess(updated);
+    flashSaved();
+  }
+
+  function flashSaved() {
+    setSavedMsg(true);
+    setTimeout(() => setSavedMsg(false), 2000);
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <span className="text-lg">🔒</span>
+        <div>
+          <p className="text-sm font-bold text-gray-900">Guide Access Control</p>
+          <p className="text-[10px] text-gray-500">
+            Restrict masterclass guides to specific email addresses. Leave empty to allow everyone.
+          </p>
+        </div>
+      </div>
+
+      {savedMsg && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-2 text-xs text-green-700 text-center font-semibold">
+          ✅ Access updated!
+        </div>
+      )}
+
+      {GUIDE_DEFS.map((guide) => {
+        const emails = getEmails(guide.id);
+        const isRestricted = emails.length > 0;
+        return (
+          <div key={guide.id} className="border border-gray-200 rounded-xl p-4 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-bold text-gray-800">{guide.label}</p>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isRestricted ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                {isRestricted ? `${emails.length} allowed` : 'Open to all'}
+              </span>
+            </div>
+
+            {/* Email list */}
+            {emails.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {emails.map((email) => (
+                  <span key={email} className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 text-xs font-medium px-2 py-1 rounded-lg">
+                    {email}
+                    <button onClick={() => removeEmail(guide.id, email)} className="text-red-500 hover:text-red-700 font-bold ml-0.5">×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Add email */}
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={newEmails[guide.id] || ''}
+                onChange={(e) => setNewEmails((prev) => ({ ...prev, [guide.id]: e.target.value }))}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addEmail(guide.id); } }}
+                placeholder="Add email address..."
+                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-orange-300"
+              />
+              <button
+                onClick={() => addEmail(guide.id)}
+                className="px-3 py-2 bg-orange-600 text-white text-xs font-bold rounded-lg shrink-0 active:scale-95 transition-transform"
+              >
+                + Add
+              </button>
+            </div>
+
+            {isRestricted && (
+              <button
+                onClick={() => clearRestriction(guide.id)}
+                className="text-[11px] text-gray-500 hover:text-red-600 font-semibold"
+              >
+                🔓 Remove all restrictions (open to everyone)
+              </button>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

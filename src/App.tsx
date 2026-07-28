@@ -1,4 +1,4 @@
-import { useApp, usePersistedActions } from './store';
+import { useApp, usePersistedActions, canAccessGuide } from './store';
 import { useAuth } from './lib/auth';
 import { isFirebaseConfigured } from './lib/firebase';
 import Dashboard from './components/Dashboard';
@@ -107,11 +107,11 @@ function AppContent() {
       case 'settings':
         return <OverheadSettingsView />;
       case 'masterclass':
-        return <PizzaMasterclass />;
+        return canAccessGuide('masterclass', state.guideAccess, user?.email) ? <PizzaMasterclass /> : <AccessDenied />;
       case 'mexican-masterclass':
-        return <MexicanMasterclass />;
+        return canAccessGuide('mexican-masterclass', state.guideAccess, user?.email) ? <MexicanMasterclass /> : <AccessDenied />;
       case 'chef-ej-masterclass':
-        return <ChefEjMasterclass />;
+        return canAccessGuide('chef-ej-masterclass', state.guideAccess, user?.email) ? <ChefEjMasterclass /> : <AccessDenied />;
       default:
         return <Dashboard />;
     }
@@ -120,7 +120,7 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-slate-50 md:flex">
       {firebaseWarningBanner}
-      <DesktopSidebar activeTab={activeTab} view={view} onNavigate={(nextView) => dispatch({ type: 'SET_VIEW', view: nextView })} />
+      <DesktopSidebar activeTab={activeTab} view={view} guideAccess={state.guideAccess} userEmail={user?.email} onNavigate={(nextView) => dispatch({ type: 'SET_VIEW', view: nextView })} />
 
       <div className={`min-w-0 flex-1 md:ml-64 ${!isFirebaseConfigured ? 'pt-9 sm:pt-8' : ''}`}>
         <div className="bg-slate-50 h-[env(safe-area-inset-top)] md:hidden" />
@@ -241,13 +241,27 @@ function AppContent() {
   );
 }
 
+function AccessDenied() {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 text-center">
+      <p className="text-5xl mb-4">🔒</p>
+      <h2 className="text-xl font-extrabold text-gray-900">Access Restricted</h2>
+      <p className="text-sm text-gray-500 mt-2 max-w-sm">You don't have permission to view this guide. Contact your admin to request access.</p>
+    </div>
+  );
+}
+
 function DesktopSidebar({
   activeTab,
   view,
+  guideAccess,
+  userEmail,
   onNavigate,
 }: {
   activeTab: string;
   view: string;
+  guideAccess: Record<string, string[]>;
+  userEmail: string | null | undefined;
   onNavigate: (view: 'dashboard' | 'ingredients' | 'recipes' | 'sales' | 'settings' | 'masterclass' | 'mexican-masterclass' | 'chef-ej-masterclass') => void;
 }) {
   const navItems = [
@@ -284,24 +298,21 @@ function DesktopSidebar({
         })}
 
         <p className="px-3 pb-2 pt-7 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Masterclasses</p>
-        <button
-          onClick={() => onNavigate('masterclass')}
-          className={`w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${view === 'masterclass' ? 'bg-amber-500 text-slate-950' : 'text-slate-300 hover:bg-white/8 hover:text-white'}`}
-        >
-          Pizza Making
-        </button>
-        <button
-          onClick={() => onNavigate('mexican-masterclass')}
-          className={`mt-1 w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${view === 'mexican-masterclass' ? 'bg-emerald-500 text-slate-950' : 'text-slate-300 hover:bg-white/8 hover:text-white'}`}
-        >
-          Flavors of Mexico
-        </button>
-        <button
-          onClick={() => onNavigate('chef-ej-masterclass')}
-          className={`mt-1 w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${view === 'chef-ej-masterclass' ? 'bg-rose-500 text-white' : 'text-slate-300 hover:bg-white/8 hover:text-white'}`}
-        >
-          Chef EJ Recipes
-        </button>
+        {canAccessGuide('masterclass', guideAccess, userEmail) && (
+          <button onClick={() => onNavigate('masterclass')} className={`w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${view === 'masterclass' ? 'bg-amber-500 text-slate-950' : 'text-slate-300 hover:bg-white/8 hover:text-white'}`}>
+            Pizza Making
+          </button>
+        )}
+        {canAccessGuide('mexican-masterclass', guideAccess, userEmail) && (
+          <button onClick={() => onNavigate('mexican-masterclass')} className={`mt-1 w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${view === 'mexican-masterclass' ? 'bg-emerald-500 text-slate-950' : 'text-slate-300 hover:bg-white/8 hover:text-white'}`}>
+            Flavors of Mexico
+          </button>
+        )}
+        {canAccessGuide('chef-ej-masterclass', guideAccess, userEmail) && (
+          <button onClick={() => onNavigate('chef-ej-masterclass')} className={`mt-1 w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${view === 'chef-ej-masterclass' ? 'bg-rose-500 text-white' : 'text-slate-300 hover:bg-white/8 hover:text-white'}`}>
+            Chef EJ Recipes
+          </button>
+        )}
       </nav>
 
       <div className="border-t border-white/10 p-4">

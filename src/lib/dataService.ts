@@ -7,7 +7,7 @@ import {
   deleteDoc,
 } from 'firebase/firestore';
 import { firestore, isFirebaseConfigured } from './firebase';
-import type { Ingredient, Recipe, SaleRecord, OverheadSettings } from '../types';
+import type { Ingredient, Recipe, SaleRecord, OverheadSettings, GuideAccessMap } from '../types';
 
 // ─── Data Service: abstracts localStorage vs Firebase Firestore ──────────
 //
@@ -40,13 +40,15 @@ export const dataService = {
     recipes: Recipe[];
     sales: SaleRecord[];
     overheadSettings: OverheadSettings | null;
+    guideAccess: GuideAccessMap;
   }> {
     if (isFirebaseConfigured && firestore && userId) {
-      const [ingsSnap, recsSnap, salesSnap, settingsSnap] = await Promise.all([
+      const [ingsSnap, recsSnap, salesSnap, settingsSnap, guideAccessSnap] = await Promise.all([
         getDocs(userCol(userId, 'ingredients')),
         getDocs(userCol(userId, 'recipes')),
         getDocs(userCol(userId, 'sales')),
         getDoc(userDoc(userId, 'meta', 'overheadSettings')),
+        getDoc(userDoc(userId, 'meta', 'guideAccess')),
       ]);
 
       return {
@@ -58,6 +60,9 @@ export const dataService = {
         overheadSettings: settingsSnap.exists()
           ? (settingsSnap.data() as OverheadSettings)
           : null,
+        guideAccess: guideAccessSnap.exists()
+          ? (guideAccessSnap.data() as GuideAccessMap)
+          : {},
       };
     }
 
@@ -71,12 +76,13 @@ export const dataService = {
           recipes: parsed.recipes || [],
           sales: parsed.sales || [],
           overheadSettings: parsed.overheadSettings || null,
+          guideAccess: parsed.guideAccess || {},
         };
       }
     } catch {
       // ignore
     }
-    return { ingredients: [], recipes: [], sales: [], overheadSettings: null };
+    return { ingredients: [], recipes: [], sales: [], overheadSettings: null, guideAccess: {} };
   },
 
   // ─── Ingredient ops ───────────────────────────────────────────────────
@@ -153,13 +159,21 @@ export const dataService = {
     }
     await persistLocal(userId, { overheadSettings: settings });
   },
+
+  async saveGuideAccess(guideAccess: GuideAccessMap, userId: UserId): Promise<void> {
+    if (isFirebaseConfigured && firestore && userId) {
+      await setDoc(userDoc(userId, 'meta', 'guideAccess'), guideAccess);
+      return;
+    }
+    await persistLocal(userId, { guideAccess });
+  },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
 async function persistLocal(
   userId: UserId,
-  patch: { ingredients?: Ingredient[]; recipes?: Recipe[]; sales?: SaleRecord[]; overheadSettings?: OverheadSettings }
+  patch: { ingredients?: Ingredient[]; recipes?: Recipe[]; sales?: SaleRecord[]; overheadSettings?: OverheadSettings; guideAccess?: GuideAccessMap }
 ) {
   const all = await dataService.loadInitial(userId);
   const merged = {
@@ -167,6 +181,7 @@ async function persistLocal(
     recipes: patch.recipes ?? all.recipes,
     sales: patch.sales ?? all.sales,
     overheadSettings: patch.overheadSettings ?? all.overheadSettings,
+    guideAccess: patch.guideAccess ?? all.guideAccess,
   };
   localStorage.setItem(lsKey(userId), JSON.stringify(merged));
 }

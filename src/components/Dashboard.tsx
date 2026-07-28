@@ -8,11 +8,18 @@ import {
   formatPeso,
   formatDate,
   groupSalesByDate,
+  canAccessGuide,
 } from '../store';
+import { useAuth } from '../lib/auth';
 
 export default function Dashboard() {
   const { state, dispatch } = useApp();
-  const { ingredients, recipes, overheadSettings: settings, sales } = state;
+  const auth = useAuth();
+  const userEmail = auth.user?.email;
+  const { ingredients, recipes, overheadSettings: settings, sales, guideAccess } = state;
+  const canPizza = canAccessGuide('masterclass', guideAccess, userEmail);
+  const canMexican = canAccessGuide('mexican-masterclass', guideAccess, userEmail);
+  const canChefEj = canAccessGuide('chef-ej-masterclass', guideAccess, userEmail);
 
   const totalIngredients = ingredients.length;
   const totalRecipes = recipes.length;
@@ -276,68 +283,49 @@ export default function Dashboard() {
         <h2 className="text-base font-bold text-gray-900 mb-3">Chef Masterclasses & Guides</h2>
         <div className="grid gap-3 lg:grid-cols-2">
           {/* Pizza Masterclass Banner */}
-          <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-red-600 rounded-3xl p-4 text-white relative overflow-hidden shadow-md shadow-orange-200">
-            <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-white/10 rounded-full blur-lg" />
-            <div className="relative flex items-center justify-between gap-3">
-              <div>
-                <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 backdrop-blur-md rounded-full text-[9px] font-extrabold uppercase tracking-wider mb-1">
-                  <span>👨‍🍳 Chef EJ Masterclass</span>
+          {canPizza && (
+            <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-red-600 rounded-3xl p-4 text-white relative overflow-hidden shadow-md shadow-orange-200">
+              <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-white/10 rounded-full blur-lg" />
+              <div className="relative flex items-center justify-between gap-3">
+                <div>
+                  <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 backdrop-blur-md rounded-full text-[9px] font-extrabold uppercase tracking-wider mb-1"><span>👨‍🍳 Chef EJ Masterclass</span></div>
+                  <h3 className="text-base font-extrabold leading-tight">Pizza Making Guide & Ratios</h3>
+                  <p className="text-xs text-orange-100 mt-0.5">Dough stages, poolish preferments, artisan sauces & costing</p>
                 </div>
-                <h3 className="text-base font-extrabold leading-tight">Pizza Making Guide & Ratios</h3>
-                <p className="text-xs text-orange-100 mt-0.5">
-                  Dough stages, poolish preferments, artisan sauces & costing
-                </p>
+                <button onClick={() => dispatch({ type: 'SET_VIEW', view: 'masterclass' })} className="px-3.5 py-2 bg-white text-orange-700 text-xs font-extrabold rounded-xl shrink-0 shadow-sm hover:bg-orange-50 active:scale-95 transition-all">Open Guide &rarr;</button>
               </div>
-              <button
-                onClick={() => dispatch({ type: 'SET_VIEW', view: 'masterclass' })}
-                className="px-3.5 py-2 bg-white text-orange-700 text-xs font-extrabold rounded-xl shrink-0 shadow-sm hover:bg-orange-50 active:scale-95 transition-all"
-              >
-                Open Guide &rarr;
-              </button>
             </div>
-          </div>
+          )}
 
           {/* Mexican Masterclass Banner */}
-          <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-red-700 rounded-3xl p-4 text-white relative overflow-hidden shadow-md shadow-emerald-200">
-            <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-white/10 rounded-full blur-lg" />
-            <div className="relative flex items-center justify-between gap-3">
-              <div>
-                <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 backdrop-blur-md rounded-full text-[9px] font-extrabold uppercase tracking-wider mb-1">
-                  <span>👨‍🍳 Chef Michael Navarra</span>
+          {canMexican && (
+            <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-red-700 rounded-3xl p-4 text-white relative overflow-hidden shadow-md shadow-emerald-200">
+              <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-white/10 rounded-full blur-lg" />
+              <div className="relative flex items-center justify-between gap-3">
+                <div>
+                  <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 backdrop-blur-md rounded-full text-[9px] font-extrabold uppercase tracking-wider mb-1"><span>👨‍🍳 Chef Michael Navarra</span></div>
+                  <h3 className="text-base font-extrabold leading-tight">Flavors of Mexico Guide</h3>
+                  <p className="text-xs text-emerald-100 mt-0.5">Birria, Barbacoa, Asada, 3 Salsas, Guacamole & exact spice ratios</p>
                 </div>
-                <h3 className="text-base font-extrabold leading-tight">Flavors of Mexico Guide</h3>
-                <p className="text-xs text-emerald-100 mt-0.5">
-                  Birria, Barbacoa, Asada, 3 Salsas, Guacamole & exact spice ratios
-                </p>
+                <button onClick={() => dispatch({ type: 'SET_VIEW', view: 'mexican-masterclass' })} className="px-3.5 py-2 bg-white text-emerald-800 text-xs font-extrabold rounded-xl shrink-0 shadow-sm hover:bg-emerald-50 active:scale-95 transition-all">Open Guide &rarr;</button>
               </div>
-              <button
-                onClick={() => dispatch({ type: 'SET_VIEW', view: 'mexican-masterclass' })}
-                className="px-3.5 py-2 bg-white text-emerald-800 text-xs font-extrabold rounded-xl shrink-0 shadow-sm hover:bg-emerald-50 active:scale-95 transition-all"
-              >
-                Open Guide &rarr;
-              </button>
             </div>
-          </div>
+          )}
 
           {/* Chef EJ Recipes Banner */}
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-rose-800 via-red-700 to-orange-600 p-4 text-white shadow-md shadow-rose-200">
-            <div className="absolute -bottom-6 -right-6 h-24 w-24 rounded-full bg-white/10 blur-lg" />
-            <div className="relative flex items-center justify-between gap-3">
-              <div>
-                <div className="mb-1 inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider backdrop-blur-md">
-                  <span>👨‍🍳 Chef EJ Recipes</span>
+          {canChefEj && (
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-rose-800 via-red-700 to-orange-600 p-4 text-white shadow-md shadow-rose-200">
+              <div className="absolute -bottom-6 -right-6 h-24 w-24 rounded-full bg-white/10 blur-lg" />
+              <div className="relative flex items-center justify-between gap-3">
+                <div>
+                  <div className="mb-1 inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider backdrop-blur-md"><span>👨‍🍳 Chef EJ Recipes</span></div>
+                  <h3 className="text-base font-extrabold leading-tight">Brioche, Sauces & Burgers Guide</h3>
+                  <p className="mt-0.5 text-xs text-rose-100">Buns, ciabatta, aioli, patty mix, sandwiches & costing</p>
                 </div>
-                <h3 className="text-base font-extrabold leading-tight">Brioche, Sauces & Burgers Guide</h3>
-                <p className="mt-0.5 text-xs text-rose-100">Buns, ciabatta, aioli, patty mix, sandwiches & costing</p>
+                <button onClick={() => dispatch({ type: 'SET_VIEW', view: 'chef-ej-masterclass' })} className="shrink-0 rounded-xl bg-white px-3.5 py-2 text-xs font-extrabold text-rose-800 shadow-sm transition-all hover:bg-rose-50 active:scale-95">Open Guide &rarr;</button>
               </div>
-              <button
-                onClick={() => dispatch({ type: 'SET_VIEW', view: 'chef-ej-masterclass' })}
-                className="shrink-0 rounded-xl bg-white px-3.5 py-2 text-xs font-extrabold text-rose-800 shadow-sm transition-all hover:bg-rose-50 active:scale-95"
-              >
-                Open Guide &rarr;
-              </button>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -345,9 +333,9 @@ export default function Dashboard() {
       <div>
         <h2 className="text-base font-bold text-gray-900 mb-3">Quick Actions</h2>
         <div className="grid grid-cols-3 gap-2.5 lg:grid-cols-6">
-          <QuickAction emoji="🍕" label="Pizza Guide" onClick={() => dispatch({ type: 'SET_VIEW', view: 'masterclass' })} />
-          <QuickAction emoji="🌮" label="Mexican Guide" onClick={() => dispatch({ type: 'SET_VIEW', view: 'mexican-masterclass' })} />
-          <QuickAction emoji="🍔" label="Chef EJ Guide" onClick={() => dispatch({ type: 'SET_VIEW', view: 'chef-ej-masterclass' })} />
+          {canPizza && <QuickAction emoji="🍕" label="Pizza Guide" onClick={() => dispatch({ type: 'SET_VIEW', view: 'masterclass' })} />}
+          {canMexican && <QuickAction emoji="🌮" label="Mexican Guide" onClick={() => dispatch({ type: 'SET_VIEW', view: 'mexican-masterclass' })} />}
+          {canChefEj && <QuickAction emoji="🍔" label="Chef EJ Guide" onClick={() => dispatch({ type: 'SET_VIEW', view: 'chef-ej-masterclass' })} />}
           <QuickAction emoji="📝" label="New Recipe" onClick={() => dispatch({ type: 'SET_VIEW', view: 'add-recipe' })} />
           <QuickAction emoji="🧺" label="Ingredient" onClick={() => dispatch({ type: 'SET_VIEW', view: 'add-ingredient' })} />
           <QuickAction emoji="💰" label="Record Sale" onClick={() => dispatch({ type: 'SET_VIEW', view: 'add-sale' })} />
