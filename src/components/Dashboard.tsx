@@ -318,6 +318,26 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
+
+          {/* Chef EJ Recipes Banner */}
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-rose-800 via-red-700 to-orange-600 p-4 text-white shadow-md shadow-rose-200">
+            <div className="absolute -bottom-6 -right-6 h-24 w-24 rounded-full bg-white/10 blur-lg" />
+            <div className="relative flex items-center justify-between gap-3">
+              <div>
+                <div className="mb-1 inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider backdrop-blur-md">
+                  <span>👨‍🍳 Chef EJ Recipes</span>
+                </div>
+                <h3 className="text-base font-extrabold leading-tight">Brioche, Sauces & Burgers Guide</h3>
+                <p className="mt-0.5 text-xs text-rose-100">Buns, ciabatta, aioli, patty mix, sandwiches & costing</p>
+              </div>
+              <button
+                onClick={() => dispatch({ type: 'SET_VIEW', view: 'chef-ej-masterclass' })}
+                className="shrink-0 rounded-xl bg-white px-3.5 py-2 text-xs font-extrabold text-rose-800 shadow-sm transition-all hover:bg-rose-50 active:scale-95"
+              >
+                Open Guide &rarr;
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -327,6 +347,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-3 gap-2.5 lg:grid-cols-6">
           <QuickAction emoji="🍕" label="Pizza Guide" onClick={() => dispatch({ type: 'SET_VIEW', view: 'masterclass' })} />
           <QuickAction emoji="🌮" label="Mexican Guide" onClick={() => dispatch({ type: 'SET_VIEW', view: 'mexican-masterclass' })} />
+          <QuickAction emoji="🍔" label="Chef EJ Guide" onClick={() => dispatch({ type: 'SET_VIEW', view: 'chef-ej-masterclass' })} />
           <QuickAction emoji="📝" label="New Recipe" onClick={() => dispatch({ type: 'SET_VIEW', view: 'add-recipe' })} />
           <QuickAction emoji="🧺" label="Ingredient" onClick={() => dispatch({ type: 'SET_VIEW', view: 'add-ingredient' })} />
           <QuickAction emoji="💰" label="Record Sale" onClick={() => dispatch({ type: 'SET_VIEW', view: 'add-sale' })} />

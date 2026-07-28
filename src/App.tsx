@@ -12,6 +12,7 @@ import SaleForm from './components/SaleForm';
 import OverheadSettingsView from './components/OverheadSettings';
 import PizzaMasterclass from './components/PizzaMasterclass';
 import MexicanMasterclass from './components/MexicanMasterclass';
+import ChefEjMasterclass from './components/ChefEjMasterclass';
 import AuthScreen from './components/AuthScreen';
 
 function AppContent() {
@@ -109,6 +110,8 @@ function AppContent() {
         return <PizzaMasterclass />;
       case 'mexican-masterclass':
         return <MexicanMasterclass />;
+      case 'chef-ej-masterclass':
+        return <ChefEjMasterclass />;
       default:
         return <Dashboard />;
     }
@@ -245,7 +248,7 @@ function DesktopSidebar({
 }: {
   activeTab: string;
   view: string;
-  onNavigate: (view: 'dashboard' | 'ingredients' | 'recipes' | 'sales' | 'settings' | 'masterclass' | 'mexican-masterclass') => void;
+  onNavigate: (view: 'dashboard' | 'ingredients' | 'recipes' | 'sales' | 'settings' | 'masterclass' | 'mexican-masterclass' | 'chef-ej-masterclass') => void;
 }) {
   const navItems = [
     { id: 'home', view: 'dashboard' as const, label: 'Overview', icon: '⌂' },
@@ -292,6 +295,12 @@ function DesktopSidebar({
           className={`mt-1 w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${view === 'mexican-masterclass' ? 'bg-emerald-500 text-slate-950' : 'text-slate-300 hover:bg-white/8 hover:text-white'}`}
         >
           Flavors of Mexico
+        </button>
+        <button
+          onClick={() => onNavigate('chef-ej-masterclass')}
+          className={`mt-1 w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${view === 'chef-ej-masterclass' ? 'bg-rose-500 text-white' : 'text-slate-300 hover:bg-white/8 hover:text-white'}`}
+        >
+          Chef EJ Recipes
         </button>
       </nav>
 
